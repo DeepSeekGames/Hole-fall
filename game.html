@@ -1,0 +1,2421 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Упасть в пропасть — Релиз 1 версия</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html, body {
+    background:#07070f; height:100%; overflow:hidden;
+    font-family:'Segoe UI', Arial, sans-serif; touch-action:none;
+    display:flex; justify-content:center; align-items:center;
+  }
+  #game {
+    position:relative; width:100vw; max-width:440px; height:100vh; max-height:860px;
+    background:linear-gradient(#1a1a3a 0%, #0a0a1a 50%, #000 100%);
+    border:3px solid #ffd700; border-radius:12px; overflow:hidden;
+    box-shadow:0 0 40px rgba(255,215,0,0.3);
+  }
+  #hud {
+    position:absolute; top:12px; left:0; width:100%;
+    display:flex; justify-content:space-between; padding:0 16px;
+    z-index:100; font-weight:bold; color:#ffd700;
+    text-shadow:0 0 10px rgba(255,215,0,0.8); font-size:15px; pointer-events:none;
+  }
+  #onlineBadge {
+    position:absolute; top:12px; left:50%; transform:translateX(-50%);
+    background:rgba(0,255,100,0.2); border:1px solid #0f0;
+    color:#0f0; padding:3px 12px; border-radius:12px;
+    font-size:12px; font-weight:bold; z-index:100;
+    box-shadow:0 0 12px rgba(0,255,0,0.4); pointer-events:none;
+  }
+  #onlineBadge .dot {
+    display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:#0f0; box-shadow:0 0 8px #0f0; margin-right:5px;
+    animation:pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+  #levelBadge {
+    position:absolute; top:38px; left:50%; transform:translateX(-50%);
+    background:linear-gradient(135deg, #ff00aa, #8800ff);
+    color:#fff; padding:4px 16px; border-radius:20px;
+    font-weight:bold; font-size:13px; z-index:100;
+    box-shadow:0 0 20px rgba(255,0,170,0.6);
+    pointer-events:none; display:none;
+  }
+  #player {
+    position:absolute; border-radius:50%; z-index:20;
+    will-change:transform; display:none; pointer-events:none;
+  }
+  .coin {
+    position:absolute; width:26px; height:26px;
+    border-radius:50%; z-index:5; will-change:transform;
+  }
+  .coin::after {
+    content:''; position:absolute; inset:6px;
+    border:2px solid rgba(0,0,0,0.4); border-radius:50%;
+  }
+  .coin.common { background:radial-gradient(circle, #fff700, #ffaa00); box-shadow:0 0 15px #ffaa00; }
+  .coin.epic { background:radial-gradient(circle, #ddaaff, #aa00ff); box-shadow:0 0 20px #aa00ff; }
+  .coin.legendary { background:radial-gradient(circle, #ffee99, #ffaa00); box-shadow:0 0 25px #ffaa00, 0 0 40px rgba(255,170,0,0.5); }
+  .coin.mythic { background:radial-gradient(circle, #ff88ff, #ff00aa); box-shadow:0 0 30px #ff00aa, 0 0 50px rgba(255,0,170,0.6); }
+  .coin.exclusive { background:radial-gradient(circle, #ffffff, #ff00ff 40%, #00ffff); box-shadow:0 0 35px #ff00ff, 0 0 60px #00ffff; animation:coinPulse 1s infinite; }
+  @keyframes coinPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.15);} }
+  .plat {
+    position:absolute;
+    background:linear-gradient(180deg, #4a4a8a, #1a1a3a);
+    border-top:3px solid #ffd700;
+    box-shadow:0 0 15px rgba(255,215,0,0.4);
+    z-index:3; border-radius:0 0 4px 4px; will-change:transform;
+    transition:opacity 0.3s;
+  }
+  .plat.moving {
+    background:linear-gradient(180deg, #ff00ff, #880088);
+    border-top-color:#ff00ff;
+    box-shadow:0 0 20px rgba(255,0,255,0.6);
+  }
+  .plat.invisible {
+    opacity:0.15;
+  }
+  .spike {
+    position:absolute;
+    background:linear-gradient(180deg, #ff3333, #880000);
+    clip-path:polygon(50% 0%, 100% 100%, 0% 100%);
+    z-index:6; will-change:transform;
+    filter:drop-shadow(0 0 4px #ff0000);
+  }
+  .saw {
+    position:absolute; width:24px; height:24px;
+    border-radius:50%;
+    background:conic-gradient(#aaa 0deg, #666 15deg, #aaa 30deg, #666 45deg, #aaa 60deg, #666 75deg, #aaa 90deg, #666 105deg, #aaa 120deg, #666 135deg, #aaa 150deg, #666 165deg, #aaa 180deg, #666 195deg, #aaa 210deg, #666 225deg, #aaa 240deg, #666 255deg, #aaa 270deg, #666 285deg, #aaa 300deg, #666 315deg, #aaa 330deg, #666 345deg, #aaa 360deg);
+    border:2px solid #888;
+    box-shadow:0 0 15px rgba(255,100,0,0.6), inset 0 0 6px rgba(0,0,0,0.6);
+    z-index:7; will-change:transform;
+    animation:sawSpin 0.6s linear infinite;
+  }
+  .saw::after {
+    content:''; position:absolute; inset:8px;
+    background:radial-gradient(circle, #333, #000);
+    border-radius:50%;
+  }
+  @keyframes sawSpin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+  .arrow {
+    position:absolute; bottom:20px;
+    width:80px; height:80px; border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, #ffe680, #ffd700 60%, #cc8800);
+    border:4px solid #fff6aa;
+    box-shadow:0 0 30px rgba(255,215,0,0.6), inset 0 -4px 10px rgba(0,0,0,0.3);
+    z-index:150; display:none; justify-content:center; align-items:center;
+    font-size:40px; color:#000; font-weight:bold;
+    cursor:pointer; touch-action:none; user-select:none;
+    transition:transform 0.05s, box-shadow 0.1s;
+  }
+  .arrow:active, .arrow.pressed {
+    transform:scale(0.9);
+    box-shadow:0 0 50px rgba(255,215,0,1), inset 0 -2px 6px rgba(0,0,0,0.4);
+    background:radial-gradient(circle at 40% 35%, #fff, #ffd700 60%, #ffaa00);
+  }
+  #arrowLeft { left:20px; }
+  #arrowRight { right:20px; }
+  #overlay {
+    position:absolute; inset:0; background:rgba(0,0,0,0.94);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    z-index:200; color:white; text-align:center; padding:20px; overflow-y:auto;
+  }
+  #overlay.hidden { display:none; }
+  #overlay h1 { color:#ffd700; font-size:24px; margin-bottom:6px; text-shadow:0 0 20px #ffd700; }
+  #overlay .subtitle { color:#ff00aa; font-size:13px; font-weight:bold; margin-bottom:14px; text-shadow:0 0 10px #ff00aa; }
+  #overlay p { font-size:14px; margin:5px 0; line-height:1.4; opacity:0.9; }
+  #overlay button {
+    margin:8px 5px 0; padding:14px 30px; font-size:17px; font-weight:bold;
+    background:linear-gradient(#ffd700, #ffaa00); border:none; border-radius:10px;
+    cursor:pointer; color:#000; box-shadow:0 5px 20px rgba(255,215,0,0.5);
+    touch-action:manipulation; position:relative; z-index:10;
+  }
+  #overlay button:active { transform:scale(0.95); }
+  #overlay button:disabled { background:#444; color:#888; box-shadow:none; cursor:not-allowed; }
+  #nickInput {
+    width:100%; max-width:280px; padding:14px 18px; font-size:16px;
+    background:#1a1a3a; border:2px solid #ffd700; border-radius:10px;
+    color:#ffd700; text-align:center; font-weight:bold; margin:8px 0; outline:none;
+  }
+  #nickInput:focus { box-shadow:0 0 20px rgba(255,215,0,0.6); }
+  #nickInput:disabled { opacity:0.5; }
+  #nickError { color:#ff4444; font-size:12px; margin-top:4px; min-height:16px; font-weight:bold; }
+  #ipInfo { color:#0fd; font-size:11px; margin-top:6px; opacity:0.7; }
+  #combo {
+    position:absolute; top:68px; width:100%; text-align:center;
+    color:#ff00aa; font-weight:bold; font-size:18px; z-index:100;
+    text-shadow:0 0 12px #ff00aa; opacity:0;
+    transition:opacity 0.3s; pointer-events:none;
+  }
+  #warning {
+    position:absolute; bottom:110px; width:100%; text-align:center;
+    color:#ff4444; font-weight:bold; font-size:16px; z-index:100;
+    text-shadow:0 0 15px #ff4444; opacity:0;
+    transition:opacity 0.2s; pointer-events:none;
+  }
+  #modifierToast {
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(0);
+    background:linear-gradient(135deg, #ff00aa, #8800ff);
+    color:#fff; padding:20px 30px; border-radius:16px;
+    font-weight:bold; font-size:18px; text-align:center;
+    z-index:180; box-shadow:0 0 40px rgba(255,0,170,0.8);
+    opacity:0; transition:all 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    pointer-events:none; max-width:80%; white-space:pre-line; line-height:1.4;
+  }
+  #modifierToast.show { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  #modifierBar {
+    position:absolute; bottom:115px; left:0; width:100%;
+    display:flex; justify-content:center; gap:6px; flex-wrap:wrap;
+    padding:0 10px; z-index:99; pointer-events:none;
+  }
+  .mod-badge {
+    background:rgba(255,0,170,0.3); border:1px solid #ff00aa;
+    color:#ff88dd; padding:3px 10px; border-radius:12px;
+    font-size:11px; font-weight:bold;
+    box-shadow:0 0 10px rgba(255,0,170,0.4);
+  }
+  #liveBoard {
+    position:absolute; top:90px; right:8px;
+    background:rgba(0,0,0,0.65);
+    border:1px solid rgba(255,215,0,0.4);
+    border-radius:8px; padding:6px 8px;
+    z-index:95; font-size:10px; color:#fff;
+    pointer-events:none; min-width:130px; max-width:150px;
+    display:none;
+  }
+  #liveBoard .lb-title {
+    color:#ffd700; font-weight:bold; font-size:10px;
+    text-align:center; margin-bottom:4px;
+    border-bottom:1px solid rgba(255,215,0,0.3); padding-bottom:2px;
+  }
+  #liveBoard .lb-entry {
+    display:flex; justify-content:space-between;
+    padding:2px 0; gap:4px; font-size:10px;
+  }
+  #liveBoard .lb-entry.self { color:#ffd700; font-weight:bold; }
+  #liveBoard .lb-nick { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  #liveBoard .lb-depth { color:#0fd; font-weight:bold; }
+  #shop, #leaderboard, #customize, #players, #adminPanel, #casesPanel, #settingsPanel, #rebirthPanel {
+    position:absolute; inset:0; background:rgba(10,10,26,0.97);
+    display:flex; flex-direction:column; z-index:250;
+    color:white; padding:16px; overflow-y:auto;
+  }
+  #shop.hidden, #leaderboard.hidden, #customize.hidden, #players.hidden,
+  #adminPanel.hidden, #casesPanel.hidden, #settingsPanel.hidden, #rebirthPanel.hidden { display:none; }
+  #shop h2, #leaderboard h2, #customize h2, #players h2,
+  #adminPanel h2, #casesPanel h2, #settingsPanel h2, #rebirthPanel h2 {
+    color:#ffd700; text-align:center; font-size:22px; margin-bottom:8px;
+    text-shadow:0 0 15px #ffd700;
+  }
+  .money-badge {
+    text-align:center; color:#ffd700; font-size:16px;
+    font-weight:bold; margin-bottom:14px;
+  }
+  .shop-item {
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border:2px solid #4a4a8a; border-radius:10px;
+    padding:12px; margin-bottom:10px;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+  }
+  .shop-item .info { flex:1; text-align:left; }
+  .shop-item .name { color:#ffd700; font-weight:bold; font-size:15px; margin-bottom:3px; }
+  .shop-item .desc { color:#aaa; font-size:12px; line-height:1.3; }
+  .shop-item .lvl { color:#0ff; font-size:12px; margin-top:3px; }
+  .shop-item button {
+    padding:10px 14px; font-size:13px; font-weight:bold;
+    background:linear-gradient(#0fd, #0a8); border:none; border-radius:8px;
+    color:#000; cursor:pointer; min-width:90px;
+    box-shadow:0 3px 12px rgba(0,255,200,0.4);
+  }
+  .shop-item button:disabled { background:#444; color:#888; box-shadow:none; cursor:not-allowed; }
+  .shop-item button:active:not(:disabled) { transform:scale(0.95); }
+  .close-btn {
+    position:sticky; bottom:0; margin-top:10px; padding:14px;
+    font-size:16px; font-weight:bold;
+    background:linear-gradient(#ffd700, #ffaa00); border:none; border-radius:10px;
+    color:#000; cursor:pointer; box-shadow:0 5px 20px rgba(255,215,0,0.5);
+  }
+  #bottomPanel {
+    position:absolute; top:100px; right:8px;
+    display:flex; flex-direction:column; gap:6px;
+    z-index:99; display:none;
+  }
+  .panel-btn {
+    width:44px; height:44px; border-radius:50%;
+    background:rgba(20,20,40,0.9);
+    border:2px solid #4a4a8a;
+    color:#fff; font-size:20px; cursor:pointer;
+    display:flex; justify-content:center; align-items:center;
+    box-shadow:0 3px 15px rgba(0,0,0,0.5);
+    touch-action:manipulation;
+  }
+  .panel-btn:active { transform:scale(0.9); }
+  .lb-row {
+    display:flex; align-items:center; gap:10px;
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border:2px solid #4a4a8a; border-radius:10px;
+    padding:10px 14px; margin-bottom:8px;
+  }
+  .lb-row.self { border-color:#ffd700; box-shadow:0 0 15px rgba(255,215,0,0.5); }
+  .lb-rank { font-size:20px; font-weight:bold; width:36px; }
+  .lb-info { flex:1; text-align:left; }
+  .lb-name { font-weight:bold; font-size:14px; color:#fff; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .lb-tag { font-size:9px; padding:1px 5px; border-radius:4px; font-weight:normal; }
+  .lb-tag.bot { background:#4a4a8a; color:#aaa; }
+  .lb-tag.me { background:#ffd700; color:#000; }
+  .lb-tag.admin { background:#ff00aa; color:#fff; }
+  .lb-depth { font-size:12px; color:#0fd; }
+  .lb-empty { text-align:center; color:#888; padding:30px 0; font-size:14px; }
+  #skinGrid {
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;
+    margin-bottom:14px;
+  }
+  .skin-card {
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border:2px solid #4a4a8a; border-radius:12px;
+    padding:10px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px;
+    cursor:pointer; position:relative;
+    transition:transform 0.1s, border-color 0.2s;
+    min-height:100px;
+  }
+  .skin-card:active { transform:scale(0.95); }
+  .skin-card.selected { border-color:#ffd700; box-shadow:0 0 20px rgba(255,215,0,0.6); }
+  .skin-card.locked { opacity:0.6; }
+  .skin-preview {
+    width:42px; height:42px; border-radius:50%;
+    border:2px solid rgba(255,255,255,0.3);
+  }
+  .skin-name { font-size:11px; font-weight:bold; color:#fff; text-align:center; }
+  .skin-status { font-size:10px; color:#0fd; }
+  .skin-card.locked .skin-status { color:#ffaa00; }
+  #skinInfo {
+    background:rgba(255,0,170,0.15); border:1px solid #ff00aa;
+    border-radius:10px; padding:10px; margin-bottom:14px;
+    font-size:12px; color:#ff88dd; text-align:center; line-height:1.4;
+  }
+  #playersList .player-card {
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border:2px solid #4a4a8a; border-radius:10px;
+    padding:10px 14px; margin-bottom:8px;
+    display:flex; align-items:center; gap:10px;
+  }
+  #playersList .player-card.me { border-color:#ffd700; }
+  #playersList .player-card .dot {
+    width:10px; height:10px; border-radius:50%;
+    background:#0f0; box-shadow:0 0 8px #0f0;
+    animation:pulse 1.5s infinite;
+  }
+  #playersList .pc-info { flex:1; text-align:left; }
+  #playersList .pc-name { font-weight:bold; font-size:14px; }
+  #playersList .pc-stats { font-size:11px; color:#0fd; margin-top:2px; }
+  #mainMenu {
+    position:absolute; inset:0; background:rgba(0,0,0,0.94);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    z-index:200; color:white; text-align:center; padding:20px; overflow-y:auto;
+  }
+  #mainMenu.hidden { display:none; }
+  #mainMenu h1 { color:#ffd700; font-size:26px; margin-bottom:4px; text-shadow:0 0 25px #ffd700; }
+  #mainMenu .subtitle { color:#ff00aa; font-size:14px; margin-bottom:16px; font-weight:bold; text-shadow:0 0 10px #ff00aa; }
+  #mainMenu .nick-display {
+    background:rgba(255,215,0,0.15); border:1px solid #ffd700;
+    padding:6px 20px; border-radius:20px; color:#ffd700;
+    font-weight:bold; margin-bottom:14px; font-size:15px;
+    display:flex; align-items:center; gap:8px;
+  }
+  #mainMenu .nick-display.admin { background:rgba(255,0,170,0.2); border-color:#ff00aa; color:#ff00aa; }
+  #mainMenu p { font-size:13px; margin:4px 0; line-height:1.4; opacity:0.9; }
+  #mainMenu button {
+    margin:6px 4px; padding:12px 22px; font-size:15px; font-weight:bold;
+    background:linear-gradient(#ffd700, #ffaa00); border:none; border-radius:10px;
+    cursor:pointer; color:#000; box-shadow:0 5px 20px rgba(255,215,0,0.5);
+    touch-action:manipulation; position:relative; z-index:10;
+  }
+  #mainMenu button:active { transform:scale(0.95); }
+  .menu-buttons {
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    max-width:340px; margin-top:6px;
+  }
+  .menu-info { display:flex; gap:14px; margin:8px 0; flex-wrap:wrap; justify-content:center; }
+  .menu-info .info-item {
+    background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.4);
+    padding:5px 12px; border-radius:10px; font-size:12px;
+  }
+  .menu-info .info-item b { color:#ffd700; }
+  .mode-buttons { display:flex; gap:12px; margin:12px 0; }
+  .mode-btn {
+    padding:16px 24px !important; font-size:16px !important;
+    border-radius:14px !important; min-width:130px;
+  }
+  #onlineModeBtn { background:linear-gradient(#0fd, #0a8) !important; }
+  #offlineModeBtn { background:linear-gradient(#ffaa00, #ff6600) !important; }
+  .case-card {
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border:2px solid #4a4a8a; border-radius:12px;
+    padding:16px; margin-bottom:12px; text-align:center;
+  }
+  .case-card .case-icon { font-size:52px; margin-bottom:8px; }
+  .case-card .case-name { color:#ffd700; font-weight:bold; font-size:16px; margin-bottom:6px; }
+  .case-card .case-desc { color:#aaa; font-size:12px; margin-bottom:12px; }
+  .case-card button {
+    padding:12px 28px; font-size:15px; font-weight:bold;
+    background:linear-gradient(#ffd700, #ffaa00); border:none; border-radius:10px;
+    color:#000; cursor:pointer; box-shadow:0 4px 15px rgba(255,215,0,0.5);
+  }
+  .case-card button:disabled { background:#444; color:#888; box-shadow:none; cursor:not-allowed; }
+  .case-card button:active:not(:disabled) { transform:scale(0.95); }
+  #caseModal {
+    position:absolute; inset:0; background:rgba(0,0,0,0.95);
+    display:flex; flex-direction:column; justify-content:center; align-items:center;
+    z-index:300; color:#fff; text-align:center; padding:20px;
+  }
+  #caseModal.hidden { display:none; }
+  #caseModal .drop-card {
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border-radius:16px; padding:24px; max-width:320px;
+    box-shadow:0 0 60px rgba(255,255,255,0.5);
+    animation:dropPop 0.6s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  }
+  @keyframes dropPop { 0%{transform:scale(0) rotate(-180deg);opacity:0;} 100%{transform:scale(1) rotate(0);opacity:1;} }
+  #caseModal .drop-preview {
+    width:90px; height:90px; border-radius:50%;
+    margin:0 auto 14px; border:3px solid rgba(255,255,255,0.3);
+  }
+  #caseModal .drop-name { font-size:18px; font-weight:bold; margin-bottom:6px; }
+  #caseModal .drop-rarity { font-size:14px; font-weight:bold; margin-bottom:14px; }
+  #caseModal button {
+    padding:12px 28px; font-size:15px; font-weight:bold;
+    background:linear-gradient(#ffd700, #ffaa00); border:none; border-radius:10px;
+    color:#000; cursor:pointer; box-shadow:0 4px 15px rgba(255,215,0,0.5);
+  }
+  .rarity-common { color:#aaa; }
+  .rarity-rare { color:#00aaff; }
+  .rarity-epic { color:#aa00ff; }
+  .rarity-legendary { color:#ffaa00; text-shadow:0 0 10px #ffaa00; }
+  .rarity-exclusive { color:#ff00aa; text-shadow:0 0 12px #ff00aa; animation:exclPulse 1.5s infinite; }
+  @keyframes exclPulse { 0%,100%{opacity:1;} 50%{opacity:0.6;} }
+  .admin-section {
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border:2px solid #ff00aa; border-radius:10px;
+    padding:12px; margin-bottom:12px;
+  }
+  .admin-section h3 { color:#ff00aa; font-size:15px; margin-bottom:10px; }
+  .admin-row { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .admin-row input, .admin-row select {
+    flex:1; min-width:80px; padding:8px 10px; font-size:13px;
+    background:#1a1a3a; border:1px solid #4a4a8a; border-radius:6px; color:#fff; outline:none;
+  }
+  .admin-row button {
+    padding:8px 14px; font-size:12px; font-weight:bold;
+    background:linear-gradient(#ff00aa, #8800ff); border:none; border-radius:6px;
+    color:#fff; cursor:pointer;
+  }
+  .admin-row button:active { transform:scale(0.95); }
+  .admin-user-row {
+    display:flex; justify-content:space-between; align-items:center;
+    background:rgba(255,255,255,0.05); border-radius:6px;
+    padding:8px 10px; margin-bottom:6px; font-size:12px; gap:8px;
+  }
+  .admin-user-row .nick { font-weight:bold; color:#ffd700; flex:1; text-align:left; }
+  .admin-user-row .actions { display:flex; gap:4px; }
+  .admin-user-row button {
+    padding:5px 10px; font-size:11px; font-weight:bold;
+    border:none; border-radius:5px; cursor:pointer;
+  }
+  .admin-user-row .kick-btn { background:#ff8800; color:#000; }
+  .admin-user-row .ban-btn { background:#ff0000; color:#fff; }
+  .skin-card.rarity-common { border-color:#888; }
+  .skin-card.rarity-rare { border-color:#00aaff; }
+  .skin-card.rarity-epic { border-color:#aa00ff; }
+  .skin-card.rarity-legendary { border-color:#ffaa00; box-shadow:0 0 15px rgba(255,170,0,0.4); }
+  .skin-card.rarity-exclusive { border-color:#ff00aa; box-shadow:0 0 20px rgba(255,0,170,0.5); }
+  .rarity-badge {
+    position:absolute; top:4px; right:4px;
+    font-size:8px; padding:2px 5px; border-radius:4px;
+    background:rgba(0,0,0,0.7); font-weight:bold;
+  }
+  .settings-item {
+    background:linear-gradient(135deg, #2a2a4a, #1a1a3a);
+    border:2px solid #4a4a8a; border-radius:10px;
+    padding:14px; margin-bottom:12px;
+  }
+  .settings-item .title { color:#ffd700; font-weight:bold; font-size:15px; margin-bottom:8px; }
+  .settings-item input[type=range] {
+    width:100%; height:8px; -webkit-appearance:none;
+    background:#1a1a3a; border-radius:5px; outline:none;
+  }
+  .settings-item input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:24px; height:24px;
+    border-radius:50%; background:linear-gradient(#ffd700,#ffaa00);
+    cursor:pointer; box-shadow:0 0 10px rgba(255,215,0,0.6);
+  }
+  .settings-item .value { color:#0fd; font-weight:bold; text-align:right; font-size:13px; margin-top:4px; }
+  .lang-buttons { display:flex; gap:10px; margin-top:8px; }
+  .lang-buttons button {
+    flex:1; padding:12px; font-size:14px; font-weight:bold;
+    background:#1a1a3a; border:2px solid #4a4a8a; border-radius:8px;
+    color:#fff; cursor:pointer;
+  }
+  .lang-buttons button.active {
+    background:linear-gradient(#ffd700,#ffaa00); color:#000; border-color:#ffd700;
+  }
+  .rebirth-info {
+    background:linear-gradient(135deg, #1a0033, #330044);
+    border:2px solid #ff00aa; border-radius:12px;
+    padding:16px; margin-bottom:14px; text-align:center;
+  }
+  .rebirth-info .title { color:#ff00aa; font-size:18px; font-weight:bold; margin-bottom:10px; }
+  .rebirth-info .stats { color:#0fd; font-size:13px; margin:5px 0; }
+  .rebirth-info .stats b { color:#ffd700; }
+  .rebirth-level {
+    background:rgba(255,0,170,0.1); border:1px solid #ff00aa;
+    border-radius:8px; padding:10px; margin-bottom:10px;
+  }
+  .rebirth-level.unlocked { border-color:#0f0; background:rgba(0,255,0,0.1); }
+  .rebirth-level.locked { opacity:0.5; }
+  .rebirth-level .lvl-title { color:#ffd700; font-weight:bold; font-size:14px; margin-bottom:4px; }
+  .rebirth-level .lvl-desc { color:#aaa; font-size:11px; margin-bottom:4px; }
+  .rebirth-level .lvl-req { color:#0fd; font-size:12px; font-weight:bold; }
+  .rebirth-level .lvl-bonus { color:#ff88dd; font-size:11px; margin-top:4px; }
+  #rebirthBtnMenu {
+    background:linear-gradient(#ff00aa, #8800ff) !important;
+    font-weight:bold;
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="hud">
+    <span>💰 <span id="money">0</span></span>
+    <span>📏 <span id="depth">0</span>м</span>
+  </div>
+  <div id="onlineBadge" style="display:none;"><span class="dot"></span><span id="onlineCount">0</span> онлайн</div>
+  <div id="levelBadge">УРОВЕНЬ 1</div>
+  <div id="combo"></div>
+  <div id="warning">⚠️ ПРОПАСТЬ!</div>
+  <div id="modifierBar"></div>
+  <div id="modifierToast"></div>
+  <div id="liveBoard">
+    <div class="lb-title">🏆 ТОП СЕЙЧАС</div>
+    <div id="liveList"></div>
+  </div>
+  <div id="bottomPanel">
+    <button class="panel-btn" id="panelShop" title="Магазин">🛒</button>
+    <button class="panel-btn" id="panelLb" title="Лидерборд">🏆</button>
+    <button class="panel-btn" id="panelCust" title="Скины">🎨</button>
+    <button class="panel-btn" id="panelSettings" title="Настройки">⚙️</button>
+  </div>
+  <div id="player"></div>
+  <div id="arrowLeft" class="arrow">◀</div>
+  <div id="arrowRight" class="arrow">▶</div>
+
+  <div id="overlay">
+    <h1>Упасть в пропасть</h1>
+    <div class="subtitle">🎮 Релиз 1 версия 🎮</div>
+    <p id="overlayPrompt" data-lang="enterNick">Введи свой никнейм:</p>
+    <input id="nickInput" type="text" maxlength="12" placeholder="Твой ник" />
+    <div id="nickError"></div>
+    <p style="font-size:12px;opacity:0.7;" data-lang="nickRule">От 2 до 12 символов, только уникальные</p>
+    <div id="ipInfo">🌐 Определяем IP...</div>
+    <button id="startBtn" type="button" data-lang="continue" disabled>ЗАГРУЗКА...</button>
+  </div>
+
+  <div id="mainMenu" class="hidden">
+    <h1>Упасть в пропасть</h1>
+    <div class="subtitle">🎮 Релиз 1 версия 🎮</div>
+    <div class="nick-display" id="nickDisplay">👤 <span id="menuNick">Игрок</span></div>
+    <div class="menu-info">
+      <div class="info-item">💰 <b id="menuMoney">0</b></div>
+      <div class="info-item">🎯 Ур. <b id="menuLevel">1</b></div>
+      <div class="info-item">🔥 RB: <b id="menuRebirth">0</b></div>
+    </div>
+    <p data-lang="arrowHint">◀ ▶ — стрелки внизу экрана</p>
+    <p data-lang="menuHint">🕳️ Падай в дыры, собирай монеты</p>
+
+    <div class="mode-buttons">
+      <button id="onlineModeBtn" class="mode-btn" type="button">🌐 <span data-lang="online">Онлайн</span></button>
+      <button id="offlineModeBtn" class="mode-btn" type="button">📴 <span data-lang="offline">Офлайн</span></button>
+    </div>
+
+    <div class="menu-buttons">
+      <button id="menuShopBtn" type="button" style="background:linear-gradient(#0fd,#0a8)">🛒 <span data-lang="shop">Магазин</span></button>
+      <button id="menuLbBtn" type="button" style="background:linear-gradient(#ffaa00,#ff6600)">🏆 <span data-lang="leaderboard">Лидерборд</span></button>
+      <button id="menuCustBtn" type="button" style="background:linear-gradient(#aa00ff,#6600cc)">🎨 <span data-lang="skins">Скины</span></button>
+      <button id="menuCasesBtn" type="button" style="background:linear-gradient(#ff00aa,#8800ff)">🎁 <span data-lang="cases">Кейсы</span></button>
+      <button id="menuRebirthBtn" type="button" style="background:linear-gradient(#ff00aa,#8800ff)">🔥 REBIRTH</button>
+      <button id="menuSettingsBtn" type="button" style="background:linear-gradient(#4a4a8a,#2a2a4a)">⚙️ <span data-lang="settings">Настройки</span></button>
+      <button id="menuAdminBtn" type="button" style="background:linear-gradient(#ff0000,#880000);display:none;">⚙️ <span data-lang="admin">Админ</span></button>
+    </div>
+  </div>
+
+  <div id="shop" class="hidden">
+    <h2>🛒 <span data-lang="shop">МАГАЗИН</span></h2>
+    <div class="money-badge">💰 <span id="shopMoney">0</span> <span data-lang="coins">монет</span></div>
+    <div id="shopItems"></div>
+    <button id="closeShop" class="close-btn" type="button" data-lang="close">ЗАКРЫТЬ</button>
+  </div>
+
+  <div id="leaderboard" class="hidden">
+    <h2>🏆 <span data-lang="leaderboard">ЛИДЕРБОРД</span></h2>
+    <div id="lbList"></div>
+    <button id="closeLb" class="close-btn" type="button" data-lang="close">ЗАКРЫТЬ</button>
+  </div>
+
+  <div id="customize" class="hidden">
+    <h2>🎨 <span data-lang="skins">КАСТОМИЗАЦИЯ</span></h2>
+    <div class="money-badge">💰 <span id="custMoney">0</span> <span data-lang="coins">монет</span></div>
+    <div id="skinInfo" data-lang="skinInfo">✨ Внешний вид НЕ влияет на хитбокс</div>
+    <div id="skinGrid"></div>
+    <button id="closeCust" class="close-btn" type="button" data-lang="close">ЗАКРЫТЬ</button>
+  </div>
+
+  <div id="casesPanel" class="hidden">
+    <h2>🎁 <span data-lang="cases">КЕЙСЫ</span></h2>
+    <div class="money-badge">💰 <span id="casesMoney">0</span> <span data-lang="coins">монет</span></div>
+    <div id="casesList"></div>
+    <button id="closeCases" class="close-btn" type="button" data-lang="close">ЗАКРЫТЬ</button>
+  </div>
+
+  <div id="caseModal" class="hidden">
+    <div class="drop-card" id="dropCard"></div>
+  </div>
+
+  <div id="rebirthPanel" class="hidden">
+    <h2>🔥 REBIRTH</h2>
+    <div class="money-badge">💰 <span id="rebirthMoney">0</span> монет · 🎯 Ур. <span id="rebirthLevel">1</span></div>
+    <div class="rebirth-info">
+      <div class="title">🔥 ТВОЙ REBIRTH: <span id="rebirthCount">0</span> / 5</div>
+      <div class="stats">Буст монет: <b id="rebirthBoost">x1.25</b></div>
+      <div class="stats">Шанс эпик-монеты: <b id="rebirthEpicChance">0.5%</b></div>
+      <div class="stats">Шанс легендарной: <b id="rebirthLegChance">0%</b></div>
+      <div class="stats">Шанс мифик: <b id="rebirthMythChance">0%</b></div>
+      <div class="stats">Шанс эксклюзив: <b id="rebirthExclChance">0%</b></div>
+    </div>
+    <div id="rebirthLevels"></div>
+    <button id="closeRebirth" class="close-btn" type="button">ЗАКРЫТЬ</button>
+  </div>
+
+  <div id="settingsPanel" class="hidden">
+    <h2>⚙️ <span data-lang="settings">НАСТРОЙКИ</span></h2>
+    <div class="settings-item">
+      <div class="title">🎵 <span data-lang="music">Музыка</span></div>
+      <input type="range" id="musicVolume" min="0" max="100" value="50" />
+      <div class="value"><span id="musicValue">50</span>%</div>
+    </div>
+    <div class="settings-item">
+      <div class="title">🔊 <span data-lang="sounds">Звуки</span></div>
+      <input type="range" id="soundsVolume" min="0" max="100" value="70" />
+      <div class="value"><span id="soundsValue">70</span>%</div>
+    </div>
+    <div class="settings-item">
+      <div class="title">🌍 <span data-lang="language">Язык</span></div>
+      <div class="lang-buttons">
+        <button id="langRu" type="button">🇷🇺 Русский</button>
+        <button id="langEn" type="button">🇬🇧 English</button>
+      </div>
+    </div>
+    <button id="closeSettings" class="close-btn" type="button" data-lang="close">ЗАКРЫТЬ</button>
+  </div>
+
+  <div id="adminPanel" class="hidden">
+    <h2>⚙️ <span data-lang="admin">АДМИН-ПАНЕЛЬ</span></h2>
+    <div class="admin-section">
+      <h3>👥 Управление игроками</h3>
+      <div id="adminUsersList"></div>
+    </div>
+    <div class="admin-section">
+      <h3>💰 Выдать деньги игроку</h3>
+      <div class="admin-row">
+        <input id="adminMoneyNick" placeholder="Ник игрока" />
+        <input id="adminMoneyAmount" type="number" placeholder="Сумма" />
+        <button id="adminGiveMoney">Выдать</button>
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>🎯 Выдать уровень игроку</h3>
+      <div class="admin-row">
+        <input id="adminLevelNick" placeholder="Ник игрока" />
+        <input id="adminLevelAmount" type="number" placeholder="Уровень (1-30)" min="1" max="30" />
+        <button id="adminGiveLevel">Выдать</button>
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>🔥 Выдать rebirth игроку</h3>
+      <div class="admin-row">
+        <input id="adminRebirthNick" placeholder="Ник игрока" />
+        <input id="adminRebirthAmount" type="number" placeholder="Rebirth (0-5)" min="0" max="5" />
+        <button id="adminGiveRebirth">Выдать</button>
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>🎨 Выдать скин игроку</h3>
+      <div class="admin-row">
+        <input id="adminSkinNick" placeholder="Ник игрока" />
+        <select id="adminSkinSelect"></select>
+        <button id="adminGiveSkin">Выдать</button>
+      </div>
+    </div>
+    <div class="admin-section">
+      <h3>🔨 Забанить / разбанить</h3>
+      <div class="admin-row">
+        <input id="adminBanNick" placeholder="Ник игрока" />
+        <button id="adminBanBtn">Забанить</button>
+        <button id="adminUnbanBtn" style="background:linear-gradient(#0fd,#0a8)">Разбанить</button>
+      </div>
+    </div>
+    <button id="closeAdmin" class="close-btn" type="button" data-lang="close">ЗАКРЫТЬ</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var LANG = {
+    ru: {
+      enterNick:'Введи свой никнейм:', nickRule:'От 2 до 12 символов, только уникальные',
+      continue:'ПРОДОЛЖИТЬ', arrowHint:'◀ ▶ — стрелки внизу экрана',
+      menuHint:'🕳️ Падай в дыры, собирай монеты',
+      online:'Онлайн', offline:'Офлайн', shop:'МАГАЗИН', leaderboard:'ЛИДЕРБОРД',
+      skins:'КАСТОМИЗАЦИЯ', cases:'КЕЙСЫ', settings:'НАСТРОЙКИ', admin:'АДМИН',
+      close:'ЗАКРЫТЬ', coins:'монет', music:'Музыка', sounds:'Звуки', language:'Язык',
+      skinInfo:'✨ Внешний вид НЕ влияет на хитбокс', level:'УРОВЕНЬ'
+    },
+    en: {
+      enterNick:'Enter your nickname:', nickRule:'2 to 12 characters, unique',
+      continue:'CONTINUE', arrowHint:'◀ ▶ — arrows at bottom',
+      menuHint:'🕳️ Fall into holes, collect coins',
+      online:'Online', offline:'Offline', shop:'SHOP', leaderboard:'LEADERBOARD',
+      skins:'CUSTOMIZE', cases:'CASES', settings:'SETTINGS', admin:'ADMIN',
+      close:'CLOSE', coins:'coins', music:'Music', sounds:'Sounds', language:'Language',
+      skinInfo:'✨ Appearance does NOT affect hitbox', level:'LEVEL'
+    }
+  };
+  var currentLang = 'ru';
+
+  function applyLanguage(lang) {
+    currentLang = lang;
+    var dict = LANG[lang];
+    document.querySelectorAll('[data-lang]').forEach(function(el) {
+      var key = el.getAttribute('data-lang');
+      if (dict[key]) el.textContent = dict[key];
+    });
+    if (nickInput) nickInput.placeholder = lang === 'ru' ? 'Твой ник' : 'Your nick';
+    document.getElementById('langRu').classList.toggle('active', lang === 'ru');
+    document.getElementById('langEn').classList.toggle('active', lang === 'en');
+    if (running) levelBadge.textContent = dict.level + ' ' + currentLevel + (currentLevel >= MAX_LEVEL ? ' (MAX)' : '');
+  }
+
+  var game = document.getElementById('game');
+  var player = document.getElementById('player');
+  var moneyEl = document.getElementById('money');
+  var depthEl = document.getElementById('depth');
+  var overlay = document.getElementById('overlay');
+  var comboEl = document.getElementById('combo');
+  var warningEl = document.getElementById('warning');
+  var arrowLeft = document.getElementById('arrowLeft');
+  var arrowRight = document.getElementById('arrowRight');
+  var levelBadge = document.getElementById('levelBadge');
+  var modifierToast = document.getElementById('modifierToast');
+  var modifierBar = document.getElementById('modifierBar');
+  var onlineBadge = document.getElementById('onlineBadge');
+  var onlineCountEl = document.getElementById('onlineCount');
+  var liveList = document.getElementById('liveList');
+  var nickInput = document.getElementById('nickInput');
+  var nickError = document.getElementById('nickError');
+  var ipInfo = document.getElementById('ipInfo');
+  var startBtn = document.getElementById('startBtn');
+  var mainMenu = document.getElementById('mainMenu');
+  var menuNick = document.getElementById('menuNick');
+  var menuMoney = document.getElementById('menuMoney');
+  var menuLevel = document.getElementById('menuLevel');
+  var menuRebirth = document.getElementById('menuRebirth');
+  var nickDisplay = document.getElementById('nickDisplay');
+  var menuAdminBtn = document.getElementById('menuAdminBtn');
+
+  var shop = document.getElementById('shop');
+  var shopMoneyEl = document.getElementById('shopMoney');
+  var shopItemsEl = document.getElementById('shopItems');
+  var closeShopBtn = document.getElementById('closeShop');
+  var leaderboard = document.getElementById('leaderboard');
+  var lbList = document.getElementById('lbList');
+  var closeLb = document.getElementById('closeLb');
+  var customize = document.getElementById('customize');
+  var skinGrid = document.getElementById('skinGrid');
+  var closeCust = document.getElementById('closeCust');
+  var custMoneyEl = document.getElementById('custMoney');
+  var casesPanel = document.getElementById('casesPanel');
+  var casesMoneyEl = document.getElementById('casesMoney');
+  var casesList = document.getElementById('casesList');
+  var closeCases = document.getElementById('closeCases');
+  var caseModal = document.getElementById('caseModal');
+  var dropCard = document.getElementById('dropCard');
+  var settingsPanel = document.getElementById('settingsPanel');
+  var closeSettings = document.getElementById('closeSettings');
+  var adminPanel = document.getElementById('adminPanel');
+  var closeAdmin = document.getElementById('closeAdmin');
+  var adminUsersList = document.getElementById('adminUsersList');
+  var bottomPanel = document.getElementById('bottomPanel');
+  var liveBoard = document.getElementById('liveBoard');
+  var rebirthPanel = document.getElementById('rebirthPanel');
+  var closeRebirth = document.getElementById('closeRebirth');
+  var rebirthMoneyEl = document.getElementById('rebirthMoney');
+  var rebirthLevelEl = document.getElementById('rebirthLevel');
+  var rebirthCountEl = document.getElementById('rebirthCount');
+  var rebirthBoostEl = document.getElementById('rebirthBoost');
+  var rebirthEpicChanceEl = document.getElementById('rebirthEpicChance');
+  var rebirthLegChanceEl = document.getElementById('rebirthLegChance');
+  var rebirthMythChanceEl = document.getElementById('rebirthMythChance');
+  var rebirthExclChanceEl = document.getElementById('rebirthExclChance');
+  var rebirthLevelsEl = document.getElementById('rebirthLevels');
+
+  var W = 400, H = 700;
+  var HITBOX = 36;
+  var VISUAL_SIZE = 42;
+  var GRAVITY = 0.8;
+  var MAX_FALL = 20;
+  var ADMIN_IP = '80.251.149.80';
+  var ADMIN_NICK = 'dpseek';
+  var MAX_ONLINE_PLAYERS = 4;
+
+  var running = false;
+  var paused = false;
+  var inMenu = true;
+  var isOnlineMode = false;
+  var px = 200, py = 150, vy = 0, money = 0, depth = 0, combo = 0, camY = 0;
+  var totalMoney = 0;
+  var plats = [], coins = [], spikes = [], saws = [];
+  var lastPlatY = 0;
+  var lastTime = 0;
+  var comboTimeout = null;
+  var leftPressed = false, rightPressed = false;
+
+  var currentLevel = 1;
+  var MAX_LEVEL = 30;
+  var levelDepthStart = 0;
+  var levelTargetDepth = 150;
+  var levelUpPending = false;
+
+  var selectedSkin = 'classic';
+  var ownedSkins = ['classic'];
+  var nickname = '';
+  var isAdmin = false;
+
+  // ===== REBIRTH =====
+  var rebirthCount = 0;
+  var MAX_REBIRTH = 5;
+  var rebirthMoneyBoost = 1.0; // стартовый, умножается
+  var rebirthEpicChance = 0;   // %
+  var rebirthLegChance = 0;
+  var rebirthMythChance = 0;
+  var rebirthExclChance = 0;
+
+  // ===== МОНЕТЫ =====
+  var COIN_VALUES = {
+    common: 10,
+    epic: 25,
+    legendary: 50,
+    mythic: 100,
+    exclusive: 150
+  };
+
+  var onlinePlayers = [];
+  var BOT_NAMES = ['ShadowX','Noob123','ProGamer','Pixel','Vortex','Ninja','Keeper',
+    'Blaster','Falcon','Titan','Rider','Ghost','Storm','Lucky','Rex',
+    'Neon','Viper','Ace','Frost','Blaze','Echo','Hawk','Wolf','Cobra',
+    'Dragon','Phoenix','Raven','Tiger','Panda','Fox'];
+
+  var RARITY = {
+    common:    { name:'Обычный',      nameEn:'Common',    color:'#aaa',     weight:50 },
+    rare:      { name:'Редкий',       nameEn:'Rare',      color:'#00aaff',  weight:25 },
+    epic:      { name:'Эпический',    nameEn:'Epic',      color:'#aa00ff',  weight:15 },
+    legendary: { name:'Легендарный',  nameEn:'Legendary', color:'#ffaa00',  weight:8 },
+    exclusive: { name:'ЭКСКЛЮЗИВ',    nameEn:'EXCLUSIVE', color:'#ff00aa',  weight:2 }
+  };
+
+  var SKINS = {
+    classic: { name:'Классика', nameEn:'Classic', rarity:'common', bg:'radial-gradient(circle at 35% 35%, #fff, #ffd700 60%, #cc8800)', shadow:'0 0 25px #ffd700, 0 0 40px rgba(255,215,0,0.5)', cost:0, caseOnly:false },
+    blue: { name:'Ледяной', nameEn:'Frozen', rarity:'common', bg:'radial-gradient(circle at 35% 35%, #fff, #00e5ff 60%, #0088aa)', shadow:'0 0 25px #00e5ff, 0 0 40px rgba(0,229,255,0.5)', cost:300, caseOnly:false },
+    pink: { name:'Розовый', nameEn:'Pink', rarity:'common', bg:'radial-gradient(circle at 35% 35%, #fff, #ff66cc 60%, #aa0088)', shadow:'0 0 25px #ff66cc, 0 0 40px rgba(255,102,204,0.5)', cost:300, caseOnly:false },
+    gray: { name:'Серый', nameEn:'Gray', rarity:'common', bg:'radial-gradient(circle at 35% 35%, #fff, #aaa 60%, #555)', shadow:'0 0 25px #aaa, 0 0 40px rgba(170,170,170,0.5)', cost:200, caseOnly:false },
+    white: { name:'Белый', nameEn:'White', rarity:'common', bg:'radial-gradient(circle at 35% 35%, #fff, #eee 60%, #999)', shadow:'0 0 25px #eee, 0 0 40px rgba(238,238,238,0.6)', cost:250, caseOnly:false },
+    green: { name:'Токсичный', nameEn:'Toxic', rarity:'rare', bg:'radial-gradient(circle at 35% 35%, #fff, #66ff00 60%, #228800)', shadow:'0 0 25px #66ff00, 0 0 40px rgba(102,255,0,0.5)', cost:500, caseOnly:false },
+    purple: { name:'Магический', nameEn:'Magic', rarity:'rare', bg:'radial-gradient(circle at 35% 35%, #fff, #aa00ff 60%, #550088)', shadow:'0 0 25px #aa00ff, 0 0 40px rgba(170,0,255,0.5)', cost:500, caseOnly:false },
+    red: { name:'Красный', nameEn:'Red', rarity:'rare', bg:'radial-gradient(circle at 35% 35%, #fff, #ff3333 60%, #880000)', shadow:'0 0 25px #ff3333, 0 0 40px rgba(255,51,51,0.5)', cost:450, caseOnly:false },
+    orange: { name:'Оранжевый', nameEn:'Orange', rarity:'rare', bg:'radial-gradient(circle at 35% 35%, #fff, #ffaa00 60%, #884400)', shadow:'0 0 25px #ffaa00, 0 0 40px rgba(255,170,0,0.5)', cost:450, caseOnly:false },
+    cyan: { name:'Бирюзовый', nameEn:'Cyan', rarity:'rare', bg:'radial-gradient(circle at 35% 35%, #fff, #00ffcc 60%, #008866)', shadow:'0 0 25px #00ffcc, 0 0 40px rgba(0,255,204,0.5)', cost:500, caseOnly:false },
+    fire: { name:'Огненный', nameEn:'Fiery', rarity:'epic', bg:'radial-gradient(circle at 35% 35%, #fff700, #ff5500 60%, #880000)', shadow:'0 0 30px #ff5500, 0 0 50px rgba(255,85,0,0.6)', cost:0, caseOnly:true },
+    ice: { name:'Кристалл', nameEn:'Crystal', rarity:'epic', bg:'radial-gradient(circle at 35% 35%, #fff, #aaddff 40%, #4488cc)', shadow:'0 0 30px #aaddff, 0 0 50px rgba(170,221,255,0.6)', cost:0, caseOnly:true },
+    gold: { name:'Золотой', nameEn:'Golden', rarity:'epic', bg:'radial-gradient(circle at 35% 35%, #fff9cc, #ffd700 50%, #aa7700)', shadow:'0 0 35px #ffd700, 0 0 60px rgba(255,215,0,0.7)', cost:0, caseOnly:true },
+    emerald: { name:'Изумруд', nameEn:'Emerald', rarity:'epic', bg:'radial-gradient(circle at 35% 35%, #d4ffcc, #00cc44 50%, #006622)', shadow:'0 0 30px #00cc44, 0 0 50px rgba(0,204,68,0.6)', cost:0, caseOnly:true },
+    neon: { name:'Неон', nameEn:'Neon', rarity:'epic', bg:'radial-gradient(circle at 35% 35%, #fff, #ff00ff 50%, #00ffff)', shadow:'0 0 30px #ff00ff, 0 0 60px #00ffff', cost:0, caseOnly:true },
+    rainbow: { name:'Радуга', nameEn:'Rainbow', rarity:'legendary', bg:'conic-gradient(#ff0000, #ffaa00, #ffff00, #00ff00, #00aaff, #aa00ff, #ff0000)', shadow:'0 0 30px #fff, 0 0 50px rgba(255,255,255,0.6)', cost:0, caseOnly:true },
+    galaxy: { name:'Галактика', nameEn:'Galaxy', rarity:'legendary', bg:'radial-gradient(circle at 35% 35%, #fff, #6633aa 50%, #000033)', shadow:'0 0 40px #6633aa, 0 0 80px rgba(102,51,170,0.7)', cost:0, caseOnly:true },
+    lava: { name:'Лава', nameEn:'Lava', rarity:'legendary', bg:'radial-gradient(circle at 35% 35%, #ffff00, #ff3300 50%, #440000)', shadow:'0 0 40px #ff3300, 0 0 70px rgba(255,51,0,0.7)', cost:0, caseOnly:true },
+    diamond: { name:'Алмаз', nameEn:'Diamond', rarity:'legendary', bg:'radial-gradient(circle at 35% 35%, #fff, #ccffff 40%, #44aaff)', shadow:'0 0 40px #ccffff, 0 0 80px rgba(204,255,255,0.8)', cost:0, caseOnly:true },
+    void: { name:'Пустота', nameEn:'Void', rarity:'exclusive', bg:'radial-gradient(circle at 50% 50%, #ff00aa, #000 70%)', shadow:'0 0 30px #ff00aa, 0 0 60px rgba(255,0,170,0.8)', cost:0, caseOnly:true },
+    demon: { name:'Демон', nameEn:'Demon', rarity:'exclusive', bg:'radial-gradient(circle at 50% 50%, #ff0000, #000 70%)', shadow:'0 0 40px #ff0000, 0 0 80px rgba(255,0,0,0.9)', cost:0, caseOnly:true },
+    angel: { name:'Ангел', nameEn:'Angel', rarity:'exclusive', bg:'radial-gradient(circle at 50% 50%, #ffffff, #ffffcc 40%, #ffccff)', shadow:'0 0 40px #ffffcc, 0 0 80px rgba(255,255,204,0.9)', cost:0, caseOnly:true }
+  };
+
+  var CASES = {
+    basic: { name:'Базовый кейс', nameEn:'Basic Case', icon:'📦', cost:200,
+      desc:'Обычные и редкие скины', descEn:'Common and rare skins',
+      pool:['blue','pink','gray','white','green','purple','red','orange','cyan'] },
+    epic: { name:'Эпический кейс', nameEn:'Epic Case', icon:'🎁', cost:800,
+      desc:'Шанс выпадения эпических скинов', descEn:'Chance for epic skins',
+      pool:['green','purple','fire','ice','gold','emerald','neon','rainbow'] },
+    legendary: { name:'Легендарный кейс', nameEn:'Legendary Case', icon:'💎', cost:2500,
+      desc:'Лучшие скины включая эксклюзив!', descEn:'Best skins incl. exclusive!',
+      pool:['fire','ice','gold','emerald','neon','rainbow','galaxy','lava','diamond','void','demon','angel'] }
+  };
+
+  var modifiers = {
+    narrowHoles:false, fastFall:false, moreSpikes:false, movingPlatforms:false,
+    noCoins:false, smallPlayer:false, darkness:false, doubleSpikes:false, saws:false, invisible:false
+  };
+  var MOD_INFO = {
+    narrowHoles:{name:'🕳️ Узкие дыры'}, fastFall:{name:'💨 Быстрое падение'},
+    moreSpikes:{name:'🔺 Больше шипов'}, movingPlatforms:{name:'🟣 Движущиеся'},
+    noCoins:{name:'🚫 Мало монет'}, smallPlayer:{name:'🔹 Маленький'},
+    darkness:{name:'🌑 Темнота'}, doubleSpikes:{name:'⚡ Двойные шипы'},
+    saws:{name:'🪚 ПИЛЫ'}, invisible:{name:'🫥 НЕВИДИМКА'}
+  };
+
+  var upgrades = {
+    magnet: { level:0, max:5, baseCost:100, name:'🧲 Магнит', nameEn:'Magnet', desc:'Радиус сбора +15px', descEn:'+15px pickup radius', value:15 },
+    speed: { level:0, max:5, baseCost:120, name:'⚡ Скорость', nameEn:'Speed', desc:'Быстрее двигается', descEn:'Faster movement', value:0.8 },
+    shield: { level:0, max:3, baseCost:200, name:'🛡️ Щит', nameEn:'Shield', desc:'Спасает от шипов', descEn:'Saves from spikes', value:1 },
+    bonus: { level:0, max:5, baseCost:150, name:'💎 Бонус', nameEn:'Bonus', desc:'+2 монеты за сбор', descEn:'+2 coins per pickup', value:2 }
+  };
+
+  // ===== НИКИ =====
+  var currentIP = 'unknown';
+  var ipReady = false;
+
+  function getNicksByIP() {
+    try { return JSON.parse(localStorage.getItem('pitNicksByIP') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveNicksByIP(obj) {
+    localStorage.setItem('pitNicksByIP', JSON.stringify(obj));
+  }
+  function getNickForCurrentIP() {
+    var data = getNicksByIP();
+    return data[currentIP] || null;
+  }
+  function registerNickForIP(nick) {
+    var data = getNicksByIP();
+    data[currentIP] = { nick: nick, date: Date.now() };
+    saveNicksByIP(data);
+  }
+  function getRegisteredNicks() {
+    try { return JSON.parse(localStorage.getItem('pitRegisteredNicks') || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveRegisteredNicks(obj) { localStorage.setItem('pitRegisteredNicks', JSON.stringify(obj)); }
+  function registerNick(nick) {
+    var reg = getRegisteredNicks();
+    reg[nick] = { date: Date.now(), banned: false, ip: currentIP };
+    saveRegisteredNicks(reg);
+    registerNickForIP(nick);
+  }
+  function isNickTakenByOther(nick) {
+    var reg = getRegisteredNicks();
+    var lower = nick.toLowerCase();
+    var savedForIP = getNickForCurrentIP();
+    for (var key in reg) {
+      if (key.toLowerCase() === lower) {
+        if (savedForIP && savedForIP.nick.toLowerCase() === lower) return false;
+        if (lower === ADMIN_NICK.toLowerCase()) return false; // ник админа можно взять
+        return true;
+      }
+    }
+    return false;
+  }
+  function isNickBanned(nick) {
+    var reg = getRegisteredNicks();
+    var lower = nick.toLowerCase();
+    for (var key in reg) { if (key.toLowerCase() === lower && reg[key].banned) return true; }
+    return false;
+  }
+  function setBan(nick, banned) {
+    var reg = getRegisteredNicks();
+    for (var key in reg) {
+      if (key.toLowerCase() === nick.toLowerCase()) { reg[key].banned = banned; break; }
+    }
+    saveRegisteredNicks(reg);
+  }
+
+  function fetchIP(callback) {
+    var done = false;
+    function finish(ip) {
+      if (done) return;
+      done = true;
+      currentIP = ip;
+      ipReady = true;
+      if (callback) callback(ip);
+    }
+    setTimeout(function() { finish('unknown_' + Date.now()); }, 5000);
+    try {
+      var xhr1 = new XMLHttpRequest();
+      xhr1.open('GET', 'https://api.ipify.org?format=json', true);
+      xhr1.onload = function() {
+        try { finish(JSON.parse(xhr1.responseText).ip); }
+        catch (e) {
+          try {
+            var xhr2 = new XMLHttpRequest();
+            xhr2.open('GET', 'https://api64.ipify.org?format=json', true);
+            xhr2.onload = function() {
+              try { finish(JSON.parse(xhr2.responseText).ip); }
+              catch (e2) { finish('unknown_' + Date.now()); }
+            };
+            xhr2.onerror = function() { finish('unknown_' + Date.now()); };
+            xhr2.send();
+          } catch (e3) { finish('unknown_' + Date.now()); }
+        }
+      };
+      xhr1.onerror = function() {
+        try {
+          var xhr3 = new XMLHttpRequest();
+          xhr3.open('GET', 'https://ipapi.co/json/', true);
+          xhr3.onload = function() {
+            try { finish(JSON.parse(xhr3.responseText).ip); }
+            catch (e4) { finish('unknown_' + Date.now()); }
+          };
+          xhr3.onerror = function() { finish('unknown_' + Date.now()); };
+          xhr3.send();
+        } catch (e5) { finish('unknown_' + Date.now()); }
+      };
+      xhr1.send();
+    } catch (e) { finish('unknown_' + Date.now()); }
+  }
+
+  // ===== ЗВУК =====
+  var audioCtx = null;
+  var musicGain = null;
+  var soundsGain = null;
+  var musicPlaying = false;
+  var musicTimer = null;
+  var musicStep = 0;
+  var musicVolume = 0.3;
+  var soundsVolume = 0.5;
+  var currentTrack = 'menu';
+
+  var NOTE = {
+    C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196.00, A3:220.00, B3:246.94,
+    C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88,
+    C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99, A5:880.00, B5:987.77
+  };
+
+  var TRACKS = {
+    menu: {
+      tempo: 380,
+      melody: [
+        NOTE.C4, null, NOTE.E4, null, NOTE.G4, null, NOTE.E4, null,
+        NOTE.F4, null, NOTE.A4, null, NOTE.G4, null, NOTE.E4, null,
+        NOTE.D4, null, NOTE.F4, null, NOTE.A4, null, NOTE.G4, null,
+        NOTE.C5, null, NOTE.G4, null, NOTE.E4, null, NOTE.C4, null
+      ],
+      bass: [
+        NOTE.C3, null, null, null, NOTE.G3, null, null, null,
+        NOTE.F3, null, null, null, NOTE.C4, null, null, null,
+        NOTE.D3, null, null, null, NOTE.A3, null, null, null,
+        NOTE.G3, null, null, null, NOTE.C3, null, null, null
+      ],
+      wave: 'sine'
+    },
+    game: {
+      tempo: 200,
+      melody: [
+        NOTE.C5, NOTE.E5, NOTE.G5, NOTE.E5, NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C5,
+        NOTE.D5, NOTE.F5, NOTE.A5, NOTE.F5, NOTE.D5, NOTE.F5, NOTE.A5, NOTE.D5,
+        NOTE.E5, NOTE.G5, NOTE.B5, NOTE.G5, NOTE.E5, NOTE.G5, NOTE.B5, NOTE.E5,
+        NOTE.F5, NOTE.A5, NOTE.C5, NOTE.A5, NOTE.F5, NOTE.A5, NOTE.C5, NOTE.F5
+      ],
+      bass: [
+        NOTE.C3, null, NOTE.G3, null, NOTE.C3, null, NOTE.G3, null,
+        NOTE.D3, null, NOTE.A3, null, NOTE.D3, null, NOTE.A3, null,
+        NOTE.E3, null, NOTE.B3, null, NOTE.E3, null, NOTE.B3, null,
+        NOTE.F3, null, NOTE.C4, null, NOTE.F3, null, NOTE.C4, null
+      ],
+      wave: 'square'
+    }
+  };
+
+  function initAudio() {
+    if (audioCtx) return;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      musicGain = audioCtx.createGain();
+      musicGain.gain.value = musicVolume * 0.4;
+      musicGain.connect(audioCtx.destination);
+      soundsGain = audioCtx.createGain();
+      soundsGain.gain.value = soundsVolume;
+      soundsGain.connect(audioCtx.destination);
+    } catch (e) {}
+  }
+
+  function playSound(type) {
+    if (!audioCtx || soundsVolume === 0) return;
+    try {
+      var now = audioCtx.currentTime;
+      if (type === 'coin') {
+        var o = audioCtx.createOscillator(); var g = audioCtx.createGain();
+        o.type = 'sine'; o.connect(g); g.connect(soundsGain);
+        o.frequency.setValueAtTime(880, now);
+        o.frequency.exponentialRampToValueAtTime(1760, now + 0.08);
+        g.gain.setValueAtTime(0.25, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        o.start(now); o.stop(now + 0.15);
+      } else if (type === 'epicCoin') {
+        var oe = audioCtx.createOscillator(); var ge = audioCtx.createGain();
+        oe.type = 'triangle'; oe.connect(ge); ge.connect(soundsGain);
+        oe.frequency.setValueAtTime(1000, now);
+        oe.frequency.exponentialRampToValueAtTime(2000, now + 0.1);
+        oe.frequency.exponentialRampToValueAtTime(3000, now + 0.2);
+        ge.gain.setValueAtTime(0.3, now);
+        ge.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+        oe.start(now); oe.stop(now + 0.25);
+      } else if (type === 'hit') {
+        var oh = audioCtx.createOscillator(); var gh = audioCtx.createGain();
+        oh.type = 'sawtooth'; oh.connect(gh); gh.connect(soundsGain);
+        oh.frequency.setValueAtTime(250, now);
+        oh.frequency.exponentialRampToValueAtTime(40, now + 0.4);
+        gh.gain.setValueAtTime(0.35, now);
+        gh.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+        oh.start(now); oh.stop(now + 0.4);
+      } else if (type === 'levelup') {
+        var notes = [523.25, 659.25, 783.99, 1046.50];
+        for (var i = 0; i < notes.length; i++) {
+          var on = audioCtx.createOscillator(); var gn = audioCtx.createGain();
+          on.type = 'triangle'; on.connect(gn); gn.connect(soundsGain);
+          on.frequency.value = notes[i];
+          var t = now + i * 0.1;
+          gn.gain.setValueAtTime(0.25, t);
+          gn.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+          on.start(t); on.stop(t + 0.2);
+        }
+      } else if (type === 'click') {
+        var oc = audioCtx.createOscillator(); var gc = audioCtx.createGain();
+        oc.type = 'square'; oc.connect(gc); gc.connect(soundsGain);
+        oc.frequency.setValueAtTime(700, now);
+        gc.gain.setValueAtTime(0.08, now);
+        gc.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        oc.start(now); oc.stop(now + 0.05);
+      } else if (type === 'case') {
+        var notesC = [440, 554.37, 659.25, 880, 1108.73];
+        for (var j = 0; j < notesC.length; j++) {
+          var oc2 = audioCtx.createOscillator(); var gc2 = audioCtx.createGain();
+          oc2.type = 'triangle'; oc2.connect(gc2); gc2.connect(soundsGain);
+          oc2.frequency.value = notesC[j];
+          var tt = now + j * 0.08;
+          gc2.gain.setValueAtTime(0.2, tt);
+          gc2.gain.exponentialRampToValueAtTime(0.001, tt + 0.15);
+          oc2.start(tt); oc2.stop(tt + 0.15);
+        }
+      } else if (type === 'saw') {
+        var os = audioCtx.createOscillator(); var gs = audioCtx.createGain();
+        os.type = 'sawtooth'; os.connect(gs); gs.connect(soundsGain);
+        os.frequency.setValueAtTime(80, now);
+        gs.gain.setValueAtTime(0.3, now);
+        gs.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        os.start(now); os.stop(now + 0.3);
+      } else if (type === 'rebirth') {
+        var notesR = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+        for (var k = 0; k < notesR.length; k++) {
+          var or = audioCtx.createOscillator(); var gr = audioCtx.createGain();
+          or.type = 'triangle'; or.connect(gr); gr.connect(soundsGain);
+          or.frequency.value = notesR[k];
+          var tr = now + k * 0.12;
+          gr.gain.setValueAtTime(0.3, tr);
+          gr.gain.exponentialRampToValueAtTime(0.001, tr + 0.3);
+          or.start(tr); or.stop(tr + 0.3);
+        }
+      }
+    } catch (e) {}
+  }
+
+  function playNote(freq, duration, wave, volume, gainNode) {
+    if (!audioCtx || !freq || musicVolume === 0) return;
+    try {
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = wave || 'sine';
+      osc.connect(gain);
+      gain.connect(gainNode || musicGain);
+      var now = audioCtx.currentTime;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(volume || 0.15, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.start(now);
+      osc.stop(now + duration + 0.05);
+    } catch (e) {}
+  }
+
+  function startMusic(trackName) {
+    if (!audioCtx) return;
+    if (musicPlaying && currentTrack === trackName) return;
+    stopMusic();
+    currentTrack = trackName || 'menu';
+    var track = TRACKS[currentTrack];
+    if (!track) return;
+    musicPlaying = true;
+    musicStep = 0;
+    function tick() {
+      if (!musicPlaying || musicVolume === 0) return;
+      var step = musicStep % track.melody.length;
+      var melodyNote = track.melody[step];
+      var bassNote = track.bass ? track.bass[step % track.bass.length] : null;
+      if (melodyNote) playNote(melodyNote, track.tempo / 1000 * 1.5, track.wave, 0.12, musicGain);
+      if (bassNote) playNote(bassNote, track.tempo / 1000 * 2.5, 'triangle', 0.2, musicGain);
+      musicStep++;
+      musicTimer = setTimeout(tick, track.tempo);
+    }
+    tick();
+  }
+
+  function stopMusic() {
+    musicPlaying = false;
+    if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+  }
+
+  function setMusicVolume(v) {
+    musicVolume = v / 100;
+    if (musicGain) musicGain.gain.value = musicVolume * 0.4;
+    document.getElementById('musicValue').textContent = Math.floor(v);
+    if (v === 0) stopMusic();
+    else if (audioCtx && running && !musicPlaying) startMusic(currentTrack);
+  }
+
+  function setSoundsVolume(v) {
+    soundsVolume = v / 100;
+    if (soundsGain) soundsGain.gain.value = soundsVolume;
+    document.getElementById('soundsValue').textContent = Math.floor(v);
+  }
+
+  // ===== REBIRTH ЛОГИКА =====
+  function updateRebirthBonuses() {
+    rebirthMoneyBoost = 1.0 + rebirthCount * 0.25;
+    rebirthEpicChance = rebirthCount * 0.5;
+    // На 5 rebirth: 1% легендарка, 0.5% мифик, 0.1% эксклюзив
+    if (rebirthCount >= 5) {
+      rebirthLegChance = 1.0;
+      rebirthMythChance = 0.5;
+      rebirthExclChance = 0.1;
+    } else {
+      rebirthLegChance = 0;
+      rebirthMythChance = 0;
+      rebirthExclChance = 0;
+    }
+  }
+
+  function getRebirthRequirements(targetRebirth) {
+    // targetRebirth = 1..5
+    var reqLevel = 5 + targetRebirth * 5; // 10, 15, 20, 25, 30
+    var reqMoney = 500; // Всегда 500 монет
+    return { level: reqLevel, money: reqMoney };
+  }
+
+  function canRebirth() {
+    if (rebirthCount >= MAX_REBIRTH) return false;
+    var req = getRebirthRequirements(rebirthCount + 1);
+    return currentLevel >= req.level && totalMoney >= req.money;
+  }
+
+  function doRebirth() {
+    if (!canRebirth()) return;
+    var req = getRebirthRequirements(rebirthCount + 1);
+    totalMoney -= req.money;
+    rebirthCount++;
+    // Сбрасываем ВСЁ кроме ника
+    totalMoney = 0;
+    currentLevel = 1;
+    ownedSkins = ['classic'];
+    selectedSkin = 'classic';
+    for (var k in upgrades) upgrades[k].level = 0;
+    updateRebirthBonuses();
+    saveProgress();
+    playSound('rebirth');
+    showToast('🔥 REBIRTH ' + rebirthCount + '!');
+    renderRebirthPanel();
+    applySkin();
+  }
+
+  function renderRebirthPanel() {
+    rebirthMoneyEl.textContent = Math.floor(totalMoney);
+    rebirthLevelEl.textContent = currentLevel;
+    rebirthCountEl.textContent = rebirthCount;
+    rebirthBoostEl.textContent = 'x' + rebirthMoneyBoost.toFixed(2);
+    rebirthEpicChanceEl.textContent = rebirthEpicChance.toFixed(1) + '%';
+    rebirthLegChanceEl.textContent = rebirthLegChance.toFixed(1) + '%';
+    rebirthMythChanceEl.textContent = rebirthMythChance.toFixed(1) + '%';
+    rebirthExclChanceEl.textContent = rebirthExclChance.toFixed(1) + '%';
+
+    rebirthLevelsEl.innerHTML = '';
+    for (var i = 1; i <= MAX_REBIRTH; i++) {
+      var req = getRebirthRequirements(i);
+      var unlocked = rebirthCount >= i - 1;
+      var canDo = rebirthCount === i - 1 && currentLevel >= req.level && totalMoney >= req.money;
+      var div = document.createElement('div');
+      div.className = 'rebirth-level ' + (unlocked ? (canDo ? 'unlocked' : '') : 'locked');
+      var bonusText = '';
+      if (i <= 4) {
+        bonusText = '+' + (0.25 * i).toFixed(2) + ' буст · +' + (0.5 * i).toFixed(1) + '% эпик';
+      } else {
+        bonusText = 'x1.25 · 2.5% эпик · 1% лег · 0.5% миф · 0.1% экскл';
+      }
+      div.innerHTML =
+        '<div class="lvl-title">🔥 REBIRTH ' + i + '</div>' +
+        '<div class="lvl-desc">' + (i <= 4 ? 'Сброс всего кроме ника' : 'МАКСИМАЛЬНЫЙ') + '</div>' +
+        '<div class="lvl-req">Требуется: Ур. ' + req.level + ' · ' + req.money + ' 💰</div>' +
+        '<div class="lvl-bonus">' + bonusText + '</div>' +
+        (canDo ? '<button class="rebirth-do-btn" data-lvl="' + i + '" style="margin-top:8px;padding:8px 20px;background:linear-gradient(#ff00aa,#8800ff);border:none;border-radius:8px;color:#fff;font-weight:bold;cursor:pointer;">СДЕЛАТЬ</button>' : '');
+      rebirthLevelsEl.appendChild(div);
+    }
+    rebirthLevelsEl.querySelectorAll('.rebirth-do-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        doRebirth();
+      });
+    });
+  }
+
+  // ===== СОХРАНЕНИЕ =====
+  function loadProgress() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('pitProgress') || '{}');
+      totalMoney = saved.money || 0;
+      currentLevel = Math.min(saved.level || 1, MAX_LEVEL);
+      selectedSkin = saved.selectedSkin || 'classic';
+      ownedSkins = saved.ownedSkins || ['classic'];
+      if (!ownedSkins || ownedSkins.indexOf('classic') === -1) ownedSkins = ['classic'];
+      rebirthCount = Math.min(saved.rebirth || 0, MAX_REBIRTH);
+      if (saved.upgrades) {
+        for (var k in upgrades) {
+          if (saved.upgrades[k] !== undefined) upgrades[k].level = Math.min(saved.upgrades[k], upgrades[k].max);
+        }
+      }
+      musicVolume = (saved.musicVolume !== undefined) ? saved.musicVolume / 100 : 0.3;
+      soundsVolume = (saved.soundsVolume !== undefined) ? saved.soundsVolume / 100 : 0.7;
+      currentLang = saved.language || 'ru';
+    } catch (e) { totalMoney = 0; currentLevel = 1; }
+    updateRebirthBonuses();
+    document.getElementById('musicVolume').value = Math.floor(musicVolume * 100);
+    document.getElementById('soundsVolume').value = Math.floor(soundsVolume * 100);
+    document.getElementById('musicValue').textContent = Math.floor(musicVolume * 100);
+    document.getElementById('soundsValue').textContent = Math.floor(soundsVolume * 100);
+  }
+
+  function saveProgress() {
+    var up = {};
+    for (var k in upgrades) up[k] = upgrades[k].level;
+    localStorage.setItem('pitProgress', JSON.stringify({
+      money: totalMoney, level: currentLevel, upgrades: up,
+      selectedSkin: selectedSkin, ownedSkins: ownedSkins,
+      rebirth: rebirthCount,
+      musicVolume: Math.floor(musicVolume * 100),
+      soundsVolume: Math.floor(soundsVolume * 100),
+      language: currentLang
+    }));
+  }
+
+  function loadLeaderboard() {
+    try { return JSON.parse(localStorage.getItem('pitLeaderboard') || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveLeaderboard(lb) { localStorage.setItem('pitLeaderboard', JSON.stringify(lb)); }
+  function addToLeaderboard(nick, depthValue, moneyValue, levelValue) {
+    var lb = loadLeaderboard();
+    lb.push({ nick: nick || 'Аноним', depth: Math.floor(depthValue), money: Math.floor(moneyValue), level: levelValue, date: Date.now() });
+    lb.sort(function(a, b) { return b.depth - a.depth; });
+    lb = lb.slice(0, 50);
+    saveLeaderboard(lb);
+    return lb;
+  }
+  function renderLeaderboard() {
+    var lb = loadLeaderboard();
+    lbList.innerHTML = '';
+    if (lb.length === 0) {
+      lbList.innerHTML = '<div class="lb-empty">Пока нет рекордов.<br>Сыграй первый забег! 🎮</div>';
+      return;
+    }
+    for (var i = 0; i < lb.length; i++) {
+      var entry = lb[i];
+      var row = document.createElement('div');
+      row.className = 'lb-row';
+      var rankText = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : ('#' + (i + 1));
+      var isSelf = entry.nick === nickname;
+      if (isSelf) row.classList.add('self');
+      row.innerHTML =
+        '<div class="lb-rank">' + rankText + '</div>' +
+        '<div class="lb-info">' +
+          '<div class="lb-name">' + escapeHtml(entry.nick) +
+            (isSelf ? ' <span class="lb-tag me">ВЫ</span>' : '') +
+          '</div>' +
+          '<div class="lb-depth">📏 ' + entry.depth + ' м · 💰 ' + entry.money + ' · Ур. ' + entry.level + '</div>' +
+        '</div>';
+      lbList.appendChild(row);
+    }
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+    });
+  }
+
+  function generateBots() {
+    onlinePlayers = [];
+    onlinePlayers.push({
+      nick: nickname || 'Ты', isBot: false, isSelf: true,
+      depth: 0, money: 0, alive: true, skin: selectedSkin, level: currentLevel, _timer: 0
+    });
+    var usedNames = {};
+    var count = MAX_ONLINE_PLAYERS - 1;
+    for (var i = 0; i < count; i++) {
+      var name;
+      var tries = 0;
+      do {
+        name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+        tries++;
+      } while (usedNames[name] && tries < 20);
+      usedNames[name] = true;
+      var skinKeys = Object.keys(SKINS);
+      var botSkin = skinKeys[Math.floor(Math.random() * skinKeys.length)];
+      onlinePlayers.push({
+        nick: name, isBot: true, isSelf: false,
+        depth: 0, money: 0, alive: true, skin: botSkin,
+        level: 1 + Math.floor(Math.random() * 5), _timer: 0,
+        _speed: 1 + Math.random() * 2, _moneyRate: 5 + Math.random() * 15,
+        _deathTimer: 100 + Math.random() * 300
+      });
+    }
+    onlineCountEl.textContent = onlinePlayers.length;
+  }
+
+  function tickBots(dt) {
+    if (!isOnlineMode) return;
+    for (var i = 0; i < onlinePlayers.length; i++) {
+      var p = onlinePlayers[i];
+      if (!p.isBot || !p.alive) continue;
+      p.depth += p._speed * dt;
+      if (Math.random() < 0.05 * dt) {
+        p.money += Math.floor(p._moneyRate * (1 + p.depth / 300) * dt);
+      }
+      p._timer += dt;
+      if (p._timer > p._deathTimer) {
+        p.alive = false;
+        setTimeout((function(bot) {
+          return function() {
+            bot.alive = true; bot.depth = 0; bot.money = 0;
+            bot._timer = 0; bot._deathTimer = 100 + Math.random() * 300;
+            bot.level = 1 + Math.floor(Math.random() * 5);
+          };
+        })(p), 3000 + Math.random() * 5000);
+      }
+    }
+    var aliveCount = 0;
+    for (var j = 0; j < onlinePlayers.length; j++) {
+      if (onlinePlayers[j].alive) aliveCount++;
+    }
+    onlineCountEl.textContent = aliveCount;
+  }
+
+  function renderLiveBoard() {
+    if (!isOnlineMode) { liveList.innerHTML = ''; return; }
+    var sorted = onlinePlayers.filter(function(p) { return p.alive; }).slice();
+    sorted.sort(function(a, b) { return b.depth - a.depth; });
+    sorted = sorted.slice(0, 5);
+    liveList.innerHTML = '';
+    for (var i = 0; i < sorted.length; i++) {
+      var p = sorted[i];
+      var div = document.createElement('div');
+      div.className = 'lb-entry' + (p.isSelf ? ' self' : '');
+      var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+      div.innerHTML =
+        '<span class="lb-nick">' + medal + (p.isSelf ? '⭐' : '') + escapeHtml(p.nick) + '</span>' +
+        '<span class="lb-depth">' + Math.floor(p.depth) + 'м</span>';
+      liveList.appendChild(div);
+    }
+  }
+
+  function applySkin() {
+    var skin = SKINS[selectedSkin] || SKINS.classic;
+    VISUAL_SIZE = 42;
+    var smallPenalty = modifiers.smallPlayer ? 6 : 0;
+    VISUAL_SIZE = Math.max(30, VISUAL_SIZE - smallPenalty);
+    HITBOX = 36;
+    player.style.width = VISUAL_SIZE + 'px';
+    player.style.height = VISUAL_SIZE + 'px';
+    player.style.background = skin.bg;
+    player.style.boxShadow = skin.shadow;
+  }
+
+  function renderCustomize() {
+    custMoneyEl.textContent = Math.floor(totalMoney);
+    skinGrid.innerHTML = '';
+    for (var key in SKINS) {
+      var skin = SKINS[key];
+      var owned = ownedSkins.indexOf(key) !== -1;
+      var selected = selectedSkin === key;
+      var card = document.createElement('div');
+      card.className = 'skin-card rarity-' + skin.rarity + (selected ? ' selected' : '') + (!owned ? ' locked' : '');
+      var statusText;
+      if (selected) statusText = '✓';
+      else if (owned) statusText = '✓';
+      else if (skin.caseOnly) statusText = '🎁';
+      else statusText = '💰 ' + skin.cost;
+      var rarityInfo = RARITY[skin.rarity];
+      var skinName = currentLang === 'ru' ? skin.name : skin.nameEn;
+      card.innerHTML =
+        '<div class="rarity-badge" style="color:' + rarityInfo.color + '">' + (currentLang === 'ru' ? rarityInfo.name : rarityInfo.nameEn) + '</div>' +
+        '<div class="skin-preview" style="background:' + skin.bg + ';box-shadow:' + skin.shadow + '"></div>' +
+        '<div class="skin-name">' + skinName + '</div>' +
+        '<div class="skin-status">' + statusText + '</div>';
+      (function(k, ownedFlag, caseOnly) {
+        card.addEventListener('click', function(e) {
+          e.preventDefault();
+          playSound('click');
+          if (ownedFlag) {
+            selectedSkin = k;
+            saveProgress();
+            applySkin();
+            renderCustomize();
+            for (var i = 0; i < onlinePlayers.length; i++) {
+              if (onlinePlayers[i].isSelf) onlinePlayers[i].skin = selectedSkin;
+            }
+          } else if (!caseOnly) {
+            var cost = SKINS[k].cost;
+            if (totalMoney >= cost) {
+              totalMoney -= cost;
+              ownedSkins.push(k);
+              selectedSkin = k;
+              saveProgress();
+              applySkin();
+              renderCustomize();
+            }
+          }
+        });
+      })(key, owned, skin.caseOnly);
+      skinGrid.appendChild(card);
+    }
+  }
+
+  function renderCases() {
+    casesMoneyEl.textContent = Math.floor(totalMoney);
+    casesList.innerHTML = '';
+    for (var key in CASES) {
+      var c = CASES[key];
+      var card = document.createElement('div');
+      card.className = 'case-card';
+      var canBuy = totalMoney >= c.cost;
+      card.innerHTML =
+        '<div class="case-icon">' + c.icon + '</div>' +
+        '<div class="case-name">' + (currentLang === 'ru' ? c.name : c.nameEn) + '</div>' +
+        '<div class="case-desc">' + (currentLang === 'ru' ? c.desc : c.descEn) + '</div>' +
+        '<button ' + (canBuy ? '' : 'disabled') + ' data-case="' + key + '">💰 ' + c.cost + '</button>';
+      casesList.appendChild(card);
+    }
+    casesList.querySelectorAll('button[data-case]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        openCase(btn.getAttribute('data-case'));
+      });
+    });
+  }
+
+  function openCase(caseKey) {
+    var c = CASES[caseKey];
+    if (totalMoney < c.cost) return;
+    totalMoney -= c.cost;
+    saveProgress();
+    casesMoneyEl.textContent = Math.floor(totalMoney);
+    playSound('case');
+    var pool = c.pool;
+    var totalWeight = 0, weights = [];
+    for (var i = 0; i < pool.length; i++) {
+      var rar = SKINS[pool[i]].rarity;
+      weights.push(RARITY[rar].weight);
+      totalWeight += RARITY[rar].weight;
+    }
+    var roll = Math.random() * totalWeight;
+    var acc = 0;
+    var chosen = pool[0];
+    for (var j = 0; j < pool.length; j++) {
+      acc += weights[j];
+      if (roll <= acc) { chosen = pool[j]; break; }
+    }
+    var isNew = ownedSkins.indexOf(chosen) === -1;
+    if (isNew) { ownedSkins.push(chosen); saveProgress(); }
+    var skin = SKINS[chosen];
+    var rarityInfo = RARITY[skin.rarity];
+    var skinName = currentLang === 'ru' ? skin.name : skin.nameEn;
+    var rarityName = currentLang === 'ru' ? rarityInfo.name : rarityInfo.nameEn;
+    dropCard.innerHTML =
+      '<div class="drop-preview" style="background:' + skin.bg + ';box-shadow:' + skin.shadow + '"></div>' +
+      '<div class="drop-name">' + skinName + '</div>' +
+      '<div class="drop-rarity rarity-' + skin.rarity + '">' + rarityName + '</div>' +
+      (isNew ? '<div style="color:#0fd;font-size:13px;margin-bottom:14px;">🎉 NEW!</div>' : '<div style="color:#888;font-size:13px;margin-bottom:14px;">✓</div>') +
+      '<button id="caseCloseBtn">OK</button>';
+    caseModal.classList.remove('hidden');
+    document.getElementById('caseCloseBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      caseModal.classList.add('hidden');
+      if (isNew) { selectedSkin = chosen; saveProgress(); applySkin(); }
+      renderCases();
+    });
+  }
+
+  // ===== МОДИФИКАТОРЫ =====
+  function getModifiersForLevel(level) {
+    return {
+      narrowHoles: level >= 2, fastFall: level >= 3, moreSpikes: level >= 4,
+      noCoins: level >= 5, movingPlatforms: level >= 6, smallPlayer: level >= 8,
+      doubleSpikes: level >= 10, darkness: level >= 12,
+      saws: level >= 25,
+      invisible: level >= 30
+    };
+  }
+
+  function updateModifierBar() {
+    modifierBar.innerHTML = '';
+    for (var k in modifiers) {
+      if (modifiers[k]) {
+        var el = document.createElement('div');
+        el.className = 'mod-badge';
+        el.textContent = MOD_INFO[k].name;
+        modifierBar.appendChild(el);
+      }
+    }
+  }
+
+  function showToast(text) {
+    modifierToast.textContent = text;
+    modifierToast.classList.add('show');
+    setTimeout(function() { modifierToast.classList.remove('show'); }, 1800);
+  }
+
+  function startLevel(level) {
+    currentLevel = level;
+    levelBadge.textContent = LANG[currentLang].level + ' ' + level + (level >= MAX_LEVEL ? ' (MAX)' : '');
+    modifiers = getModifiersForLevel(level);
+    updateModifierBar();
+    applySkin();
+    saveProgress();
+  }
+
+  function measure() {
+    var r = game.getBoundingClientRect();
+    W = r.width || 400;
+    H = r.height || 700;
+  }
+
+  function startRun(online) {
+    isOnlineMode = online;
+    measure();
+    inMenu = false;
+    startLevel(currentLevel);
+    px = W / 2 - HITBOX / 2;
+    py = 150; vy = 0; money = 0; depth = 0; combo = 0; camY = 0;
+    plats = []; coins = []; spikes = []; saws = [];
+    lastPlatY = 0;
+    leftPressed = false; rightPressed = false;
+    levelDepthStart = 0;
+    levelTargetDepth = 120 + currentLevel * 30;
+    levelUpPending = false;
+
+    game.querySelectorAll('.plat, .coin, .spike, .saw').forEach(function(e) { e.remove(); });
+    addPlatform(W / 2 - 90, 220, 180);
+    lastPlatY = 220;
+    for (var i = 0; i < 12; i++) spawnPlatform();
+
+    moneyEl.textContent = '0';
+    depthEl.textContent = '0';
+    comboEl.style.opacity = 0;
+    warningEl.style.opacity = 0;
+    player.style.display = 'block';
+    updatePlayerVisual();
+
+    overlay.classList.add('hidden');
+    mainMenu.classList.add('hidden');
+    shop.classList.add('hidden');
+    leaderboard.classList.add('hidden');
+    customize.classList.add('hidden');
+    casesPanel.classList.add('hidden');
+    settingsPanel.classList.add('hidden');
+    adminPanel.classList.add('hidden');
+    rebirthPanel.classList.add('hidden');
+    caseModal.classList.add('hidden');
+    arrowLeft.style.display = 'flex';
+    arrowRight.style.display = 'flex';
+    bottomPanel.style.display = 'flex';
+    levelBadge.style.display = 'block';
+    onlineBadge.style.display = online ? 'block' : 'none';
+    liveBoard.style.display = online ? 'block' : 'none';
+    running = true;
+    paused = false;
+
+    if (online) generateBots();
+    initAudio();
+    if (musicVolume > 0) startMusic('game');
+  }
+
+  function updatePlayerVisual() {
+    var offset = (VISUAL_SIZE - HITBOX) / 2;
+    var screenY = py - camY - offset;
+    player.style.transform = 'translate(' + (px - offset) + 'px,' + screenY + 'px)';
+  }
+
+  function addPlatform(x, y, w, isMoving, isInvisible) {
+    if (w < 10) return;
+    var el = document.createElement('div');
+    el.className = 'plat' + (isMoving ? ' moving' : '') + (isInvisible ? ' invisible' : '');
+    el.style.width = w + 'px';
+    el.style.height = '18px';
+    game.appendChild(el);
+    plats.push({ x:x, y:y, w:w, h:18, el:el, baseX:x, isMoving:!!isMoving, dir:1, speed:0.8 + Math.random()*0.7, isInvisible:!!isInvisible });
+  }
+
+  function addSpike(x, y) {
+    var el = document.createElement('div');
+    el.className = 'spike';
+    el.style.width = '18px'; el.style.height = '18px';
+    game.appendChild(el);
+    spikes.push({ x:x, y:y, w:18, h:18, el:el });
+  }
+
+  function addSaw(x, y) {
+    var el = document.createElement('div');
+    el.className = 'saw';
+    game.appendChild(el);
+    saws.push({ x:x, y:y, w:24, h:24, el:el, dir: Math.random() < 0.5 ? -1 : 1, speed: 1 + Math.random() * 1.5 });
+  }
+
+  // Выбор типа монеты с учётом rebirth
+  function pickCoinType() {
+    var roll = Math.random() * 100;
+    if (roll < rebirthExclChance) return 'exclusive';
+    if (roll < rebirthExclChance + rebirthMythChance) return 'mythic';
+    if (roll < rebirthExclChance + rebirthMythChance + rebirthLegChance) return 'legendary';
+    if (roll < rebirthExclChance + rebirthMythChance + rebirthLegChance + rebirthEpicChance) return 'epic';
+    return 'common';
+  }
+
+  function spawnPlatform() {
+    var lvl = currentLevel;
+    var gapMin = 125 - Math.min(20, lvl * 2);
+    var gapMax = 175 + Math.min(80, depth * 0.2) + lvl * 5;
+    var gap = gapMin + Math.random() * (gapMax - gapMin);
+    var y = lastPlatY + gap;
+    var holeBase = 110 - Math.min(30, lvl * 3);
+    var holeW = Math.max(70, holeBase + Math.random() * Math.min(50, 30 + depth / 60));
+    var minX = 40;
+    var maxX = W - holeW - 40;
+    if (maxX < minX) { holeW = Math.max(70, W - 80); minX = 40; maxX = Math.max(40, W - holeW - 40); }
+    var holeX = minX + Math.random() * (maxX - minX);
+    var leftW = holeX;
+    var rightW = W - (holeX + holeW);
+    var moveChance = modifiers.movingPlatforms ? 0.4 : 0;
+    var invisibleChance = modifiers.invisible ? 0.25 : 0;
+
+    if (leftW >= 20) {
+      var isMovL = Math.random() < moveChance && leftW > 80;
+      var isInvL = Math.random() < invisibleChance;
+      addPlatform(0, y, leftW, isMovL, isInvL);
+      var spikeChance = Math.min(0.85, 0.35 + depth / 3000 + (modifiers.moreSpikes ? 0.25 : 0) + lvl * 0.02);
+      if (leftW > 50 && Math.random() < spikeChance) {
+        var sx = 15 + Math.random() * (leftW - 40);
+        addSpike(sx, y - 18);
+        if (modifiers.doubleSpikes && leftW > 80 && Math.random() < 0.6) {
+          var sx2 = Math.min(leftW - 40, sx + 24);
+          if (sx2 > 15) addSpike(sx2, y - 18);
+        }
+      }
+    }
+    if (rightW >= 20) {
+      var isMovR = Math.random() < moveChance && rightW > 80;
+      var isInvR = Math.random() < invisibleChance;
+      addPlatform(holeX + holeW, y, rightW, isMovR, isInvR);
+      var spikeChance2 = Math.min(0.85, 0.35 + depth / 3000 + (modifiers.moreSpikes ? 0.25 : 0) + lvl * 0.02);
+      if (rightW > 50 && Math.random() < spikeChance2) {
+        var sx3 = holeX + holeW + 15 + Math.random() * (rightW - 40);
+        addSpike(sx3, y - 18);
+        if (modifiers.doubleSpikes && rightW > 80 && Math.random() < 0.6) {
+          var sx4 = Math.min(holeX + holeW + rightW - 20, sx3 + 24);
+          if (sx4 > holeX + holeW + 15) addSpike(sx4, y - 18);
+        }
+      }
+    }
+    if (holeX < 20 && rightW < 20) {
+      holeW = W - 80; holeX = 40;
+      addPlatform(0, y, 40, false, Math.random() < invisibleChance);
+      addPlatform(W - 40, y, 40, false, Math.random() < invisibleChance);
+      rightW = 40;
+    }
+    var coinChance = modifiers.noCoins ? 0.4 : 1.0;
+    if (Math.random() < coinChance) spawnCoin(holeX / 2, y - 50);
+    if (rightW >= 40 && Math.random() < coinChance) spawnCoin(holeX + holeW + rightW / 2, y - 50);
+
+    if (modifiers.saws && Math.random() < 0.5) {
+      addSaw(holeX + holeW / 2, y - 60);
+    }
+
+    lastPlatY = y;
+  }
+
+  function spawnCoin(x, y) {
+    if (x < 20 || x > W - 20) return;
+    var el = document.createElement('div');
+    var type = pickCoinType();
+    el.className = 'coin ' + type;
+    game.appendChild(el);
+    coins.push({ x:x, y:y, el:el, type:type, collected:false });
+  }
+
+  function update(dt) {
+    var baseSpeed = 7 + upgrades.speed.level * upgrades.speed.value;
+    var moveDir = 0;
+    if (leftPressed && !rightPressed) moveDir = -1;
+    if (rightPressed && !leftPressed) moveDir = 1;
+    if (moveDir !== 0) px += moveDir * baseSpeed * dt;
+    px = Math.max(-8, Math.min(W - HITBOX + 8, px));
+
+    var gravity = GRAVITY * (modifiers.fastFall ? 1.35 : 1);
+    var maxFall = MAX_FALL * (modifiers.fastFall ? 1.3 : 1);
+    vy = Math.min(vy + gravity * dt, maxFall);
+    var prevBottom = py + HITBOX;
+    py += vy * dt;
+    var bottom = py + HITBOX;
+
+    for (var i = 0; i < plats.length; i++) {
+      var p = plats[i];
+      if (p.isMoving) {
+        p.x += p.dir * p.speed * dt;
+        var maxShift = 60;
+        if (p.x > p.baseX + maxShift) { p.dir = -1; p.x = p.baseX + maxShift; }
+        if (p.x < p.baseX - maxShift) { p.dir = 1; p.x = p.baseX - maxShift; }
+      }
+    }
+
+    for (var i2 = 0; i2 < plats.length; i2++) {
+      var p2 = plats[i2];
+      if (px + HITBOX > p2.x + 3 && px < p2.x + p2.w - 3) {
+        if (vy > 0 && prevBottom <= p2.y + 3 && bottom >= p2.y) {
+          py = p2.y - HITBOX;
+          vy = 0;
+          break;
+        }
+      }
+    }
+
+    for (var s = 0; s < spikes.length; s++) {
+      var sp = spikes[s];
+      if (px + HITBOX > sp.x + 2 && px < sp.x + sp.w - 2 &&
+          py + HITBOX > sp.y + 2 && py < sp.y + sp.h - 2) {
+        if (upgrades.shield.level > 0) {
+          upgrades.shield.level--;
+          saveProgress();
+          spikes.splice(s, 1);
+          sp.el.remove();
+          player.style.boxShadow = '0 0 60px 20px #0ff';
+          setTimeout(function() { applySkin(); }, 300);
+          break;
+        } else {
+          die('⚠️ СПИКС!');
+          return;
+        }
+      }
+    }
+
+    for (var si = 0; si < saws.length; si++) {
+      var saw = saws[si];
+      saw.x += saw.dir * saw.speed * dt;
+      if (saw.x > W - 30 || saw.x < 5) { saw.dir *= -1; }
+      var dxS = (px + HITBOX / 2) - (saw.x + 12);
+      var dyS = (py + HITBOX / 2) - (saw.y + 12);
+      if (Math.sqrt(dxS * dxS + dyS * dyS) < HITBOX / 2 + 12) {
+        playSound('saw');
+        if (upgrades.shield.level > 0) {
+          upgrades.shield.level--;
+          saveProgress();
+          saws.splice(si, 1);
+          saw.el.remove();
+          player.style.boxShadow = '0 0 60px 20px #0ff';
+          setTimeout(function() { applySkin(); }, 300);
+          break;
+        } else {
+          die('🪚 ПИЛА!');
+          return;
+        }
+      }
+    }
+
+    var pcx = px + HITBOX / 2;
+    var pcy = py + HITBOX / 2;
+    var magnetRange = 34 + upgrades.magnet.level * upgrades.magnet.value;
+    for (var j = 0; j < coins.length; j++) {
+      var c = coins[j];
+      if (c.collected) continue;
+      var dx = pcx - c.x;
+      var dy = pcy - c.y;
+      if (dx * dx + dy * dy < magnetRange * magnetRange) {
+        c.collected = true;
+        c.el.remove();
+        var baseValue = COIN_VALUES[c.type] || 10;
+        var gain = Math.floor((baseValue + upgrades.bonus.level * upgrades.bonus.value) * rebirthMoneyBoost);
+        money += gain;
+        totalMoney += gain;
+        combo++;
+        moneyEl.textContent = Math.floor(money);
+        saveProgress();
+        if (c.type === 'common') playSound('coin');
+        else if (c.type === 'epic') playSound('epicCoin');
+        else if (c.type === 'legendary') playSound('levelup');
+        else if (c.type === 'mythic') playSound('rebirth');
+        else if (c.type === 'exclusive') playSound('rebirth');
+        showCombo();
+      }
+    }
+
+    if (py > camY + H + 80) { die('💀 ' + (currentLang === 'ru' ? 'УПАЛ В ПРОПАСТЬ!' : 'FELL INTO PIT!')); return; }
+
+    var threshold = camY + H * 0.55;
+    if (py > threshold) camY = py - H * 0.55;
+    depth = Math.max(depth, camY / 10);
+    depthEl.textContent = Math.floor(depth);
+
+    if (isOnlineMode) {
+      for (var i3 = 0; i3 < onlinePlayers.length; i3++) {
+        if (onlinePlayers[i3].isSelf) {
+          onlinePlayers[i3].depth = depth;
+          onlinePlayers[i3].money = money;
+          onlinePlayers[i3].level = currentLevel;
+          onlinePlayers[i3].skin = selectedSkin;
+        }
+      }
+    }
+
+    if (!levelUpPending && depth - levelDepthStart >= levelTargetDepth && currentLevel < MAX_LEVEL) {
+      levelUpPending = true;
+      levelDepthStart = depth;
+      currentLevel++;
+      playSound('levelup');
+      showToast('🎉 ' + LANG[currentLang].level + ' ' + currentLevel + '!');
+      startLevel(currentLevel);
+      levelTargetDepth = 120 + currentLevel * 30;
+      setTimeout(function() { levelUpPending = false; }, 500);
+    }
+
+    while (lastPlatY < camY + H + 300) spawnPlatform();
+
+    plats = plats.filter(function(p3) {
+      if (p3.y < camY - 200) { p3.el.remove(); return false; }
+      return true;
+    });
+    coins = coins.filter(function(c2) {
+      if (c2.collected) return false;
+      if (c2.y < camY - 150) { c2.el.remove(); return false; }
+      return true;
+    });
+    spikes = spikes.filter(function(s2) {
+      if (s2.y < camY - 200) { s2.el.remove(); return false; }
+      return true;
+    });
+    saws = saws.filter(function(s3) {
+      if (s3.y < camY - 200) { s3.el.remove(); return false; }
+      return true;
+    });
+
+    updatePlayerVisual();
+    for (var k = 0; k < plats.length; k++) plats[k].el.style.transform = 'translate(' + plats[k].x + 'px,' + (plats[k].y - camY) + 'px)';
+    for (var m = 0; m < coins.length; m++) {
+      if (!coins[m].collected) coins[m].el.style.transform = 'translate(' + (coins[m].x - 13) + 'px,' + (coins[m].y - 13 - camY) + 'px)';
+    }
+    for (var n = 0; n < spikes.length; n++) spikes[n].el.style.transform = 'translate(' + spikes[n].x + 'px,' + (spikes[n].y - camY) + 'px)';
+    for (var o = 0; o < saws.length; o++) saws[o].el.style.transform = 'translate(' + saws[o].x + 'px,' + (saws[o].y - camY) + 'px)';
+
+    if (modifiers.darkness) game.style.background = 'linear-gradient(#050510 0%, #000 50%, #000 100%)';
+    else game.style.background = 'linear-gradient(#1a1a3a 0%, #0a0a1a 50%, #000 100%)';
+
+    warningEl.style.opacity = (py > camY + H - 140) ? 1 : 0;
+
+    tickBots(dt);
+  }
+
+  function showCombo() {
+    if (combo > 1) {
+      comboEl.textContent = '🔥 x' + combo;
+      comboEl.style.opacity = 1;
+      clearTimeout(comboTimeout);
+      comboTimeout = setTimeout(function() { comboEl.style.opacity = 0; }, 900);
+    }
+  }
+
+  function die(reason) {
+    running = false;
+    leftPressed = false; rightPressed = false;
+    arrowLeft.style.display = 'none';
+    arrowRight.style.display = 'none';
+    bottomPanel.style.display = 'none';
+    liveBoard.style.display = 'none';
+    onlineBadge.style.display = 'none';
+    levelBadge.style.display = 'none';
+    stopMusic();
+    playSound('hit');
+
+    var best = Math.max(parseInt(localStorage.getItem('bestDepth') || '0', 10), Math.floor(depth));
+    localStorage.setItem('bestDepth', best);
+    saveProgress();
+    addToLeaderboard(nickname || 'Ты', depth, money, currentLevel);
+
+    var lb = loadLeaderboard();
+    var myRank = -1;
+    for (var i = 0; i < lb.length; i++) {
+      if (lb[i].nick === (nickname || 'Ты') && lb[i].depth === Math.floor(depth)) { myRank = i + 1; break; }
+    }
+
+    overlay.innerHTML =
+      '<h1>' + reason + '</h1>' +
+      '<p style="color:#ff00aa;font-weight:bold;font-size:12px;">Упасть в пропасть — Релиз 1 версия</p>' +
+      '<p>🎯 Ур: <b style="color:#ff00aa">' + currentLevel + '</b></p>' +
+      '<p>🔥 Rebirth: <b style="color:#ff00aa">' + rebirthCount + '</b></p>' +
+      '<p>💰 Заработано: <b style="color:#ffd700">' + Math.floor(money) + '</b></p>' +
+      '<p>🏦 Всего: <b style="color:#0fd">' + Math.floor(totalMoney) + '</b></p>' +
+      '<p>📏 Глубина: <b>' + Math.floor(depth) + '</b> м</p>' +
+      (myRank > 0 ? '<p>🏆 Место: <b style="color:#ffd700">#' + myRank + '</b></p>' : '') +
+      '<button id="restartBtn" type="button">ЕЩЁ РАЗ!</button>' +
+      '<button id="toMenuBtn" type="button" style="background:linear-gradient(#aa00ff,#6600cc)">🏠 В МЕНЮ</button>';
+    overlay.classList.remove('hidden');
+    document.getElementById('restartBtn').addEventListener('click', function(e) { e.preventDefault(); startRun(isOnlineMode); }, false);
+    document.getElementById('toMenuBtn').addEventListener('click', function(e) { e.preventDefault(); showMainMenu(); }, false);
+  }
+
+  function showMainMenu() {
+    inMenu = true;
+    running = false;
+    paused = false;
+    stopMusic();
+    arrowLeft.style.display = 'none';
+    arrowRight.style.display = 'none';
+    bottomPanel.style.display = 'none';
+    liveBoard.style.display = 'none';
+    onlineBadge.style.display = 'none';
+    levelBadge.style.display = 'none';
+    game.querySelectorAll('.plat, .coin, .spike, .saw').forEach(function(e) { e.remove(); });
+    player.style.display = 'none';
+
+    menuNick.textContent = nickname || 'Игрок';
+    menuMoney.textContent = Math.floor(totalMoney);
+    menuLevel.textContent = currentLevel;
+    menuRebirth.textContent = rebirthCount;
+
+    // Админ = IP совпадает
+    isAdmin = (currentIP === ADMIN_IP);
+    if (isAdmin) {
+      nickDisplay.classList.add('admin');
+      menuAdminBtn.style.display = 'block';
+    } else {
+      nickDisplay.classList.remove('admin');
+      menuAdminBtn.style.display = 'none';
+    }
+
+    overlay.classList.add('hidden');
+    mainMenu.classList.remove('hidden');
+    shop.classList.add('hidden');
+    leaderboard.classList.add('hidden');
+    customize.classList.add('hidden');
+    casesPanel.classList.add('hidden');
+    settingsPanel.classList.add('hidden');
+    adminPanel.classList.add('hidden');
+    rebirthPanel.classList.add('hidden');
+    caseModal.classList.add('hidden');
+
+    initAudio();
+    if (musicVolume > 0) setTimeout(function() { startMusic('menu'); }, 100);
+  }
+
+  function openShop() {
+    paused = true;
+    shopMoneyEl.textContent = Math.floor(totalMoney);
+    renderShop();
+    shop.classList.remove('hidden'); overlay.classList.add('hidden'); mainMenu.classList.add('hidden');
+  }
+
+  function renderShop() {
+    shopItemsEl.innerHTML = '';
+    for (var k in upgrades) {
+      var u = upgrades[k];
+      var cost = Math.floor(u.baseCost * Math.pow(1.8, u.level));
+      var canBuy = u.level < u.max && totalMoney >= cost;
+      var name = currentLang === 'ru' ? u.name : u.nameEn;
+      var desc = currentLang === 'ru' ? u.desc : u.descEn;
+      var item = document.createElement('div');
+      item.className = 'shop-item';
+      item.innerHTML =
+        '<div class="info">' +
+          '<div class="name">' + name + '</div>' +
+          '<div class="desc">' + desc + '</div>' +
+          '<div class="lvl">Lvl: ' + u.level + ' / ' + u.max + '</div>' +
+        '</div>' +
+        '<button data-key="' + k + '" ' + (canBuy ? '' : 'disabled') + '>' + (u.level >= u.max ? 'MAX' : '💰 ' + cost) + '</button>';
+      shopItemsEl.appendChild(item);
+    }
+    shopItemsEl.querySelectorAll('button[data-key]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var key = btn.getAttribute('data-key');
+        var u = upgrades[key];
+        var cost = Math.floor(u.baseCost * Math.pow(1.8, u.level));
+        if (u.level < u.max && totalMoney >= cost) {
+          totalMoney -= cost;
+          u.level++;
+          saveProgress();
+          shopMoneyEl.textContent = Math.floor(totalMoney);
+          applySkin();
+          playSound('click');
+          renderShop();
+        }
+      });
+    });
+  }
+
+  function openLeaderboard() {
+    paused = true;
+    renderLeaderboard();
+    leaderboard.classList.remove('hidden'); overlay.classList.add('hidden'); mainMenu.classList.add('hidden');
+  }
+
+  function openCustomize() {
+    paused = true;
+    renderCustomize();
+    customize.classList.remove('hidden'); overlay.classList.add('hidden'); mainMenu.classList.add('hidden');
+  }
+
+  function openCases() {
+    paused = true;
+    renderCases();
+    casesPanel.classList.remove('hidden'); overlay.classList.add('hidden'); mainMenu.classList.add('hidden');
+  }
+
+  function openRebirth() {
+    paused = true;
+    renderRebirthPanel();
+    rebirthPanel.classList.remove('hidden'); overlay.classList.add('hidden'); mainMenu.classList.add('hidden');
+  }
+
+  function openSettings() {
+    paused = true;
+    settingsPanel.classList.remove('hidden'); overlay.classList.add('hidden'); mainMenu.classList.add('hidden');
+    document.getElementById('langRu').classList.toggle('active', currentLang === 'ru');
+    document.getElementById('langEn').classList.toggle('active', currentLang === 'en');
+  }
+
+  function renderAdminPanel() {
+    adminUsersList.innerHTML = '';
+    for (var i = 0; i < onlinePlayers.length; i++) {
+      var p = onlinePlayers[i];
+      if (p.isSelf) continue;
+      var row = document.createElement('div');
+      row.className = 'admin-user-row';
+      row.innerHTML =
+        '<span class="nick">' + escapeHtml(p.nick) + (p.isBot ? ' <span class="lb-tag bot">БОТ</span>' : '') + '</span>' +
+        '<span class="actions">' +
+          '<button class="kick-btn" data-nick="' + escapeHtml(p.nick) + '">👢 Кик</button>' +
+          '<button class="ban-btn" data-nick="' + escapeHtml(p.nick) + '">🔨 Бан</button>' +
+        '</span>';
+      adminUsersList.appendChild(row);
+    }
+    var skinSelect = document.getElementById('adminSkinSelect');
+    skinSelect.innerHTML = '';
+    for (var k in SKINS) {
+      var opt = document.createElement('option');
+      opt.value = k;
+      opt.textContent = SKINS[k].name + ' (' + RARITY[SKINS[k].rarity].name + ')';
+      skinSelect.appendChild(opt);
+    }
+    adminUsersList.querySelectorAll('.kick-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        kickPlayer(btn.getAttribute('data-nick'));
+      });
+    });
+    adminUsersList.querySelectorAll('.ban-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        banPlayer(btn.getAttribute('data-nick'));
+      });
+    });
+  }
+
+  function kickPlayer(nick) {
+    for (var i = 0; i < onlinePlayers.length; i++) {
+      if (onlinePlayers[i].nick.toLowerCase() === nick.toLowerCase() && !onlinePlayers[i].isSelf) {
+        onlinePlayers.splice(i, 1);
+        break;
+      }
+    }
+    renderAdminPanel();
+  }
+  function banPlayer(nick) {
+    setBan(nick, true);
+    kickPlayer(nick);
+    renderAdminPanel();
+  }
+
+  function openAdmin() {
+    if (!isAdmin) return;
+    paused = true;
+    renderAdminPanel();
+    adminPanel.classList.remove('hidden'); overlay.classList.add('hidden'); mainMenu.classList.add('hidden');
+  }
+
+  function closePanel(panel) {
+    panel.classList.add('hidden');
+    if (running) { paused = false; arrowLeft.style.display = 'flex'; arrowRight.style.display = 'flex'; }
+    else { showMainMenu(); }
+  }
+
+  function loop(time) {
+    if (!lastTime) lastTime = time;
+    var dt = Math.min((time - lastTime) / 16.67, 3);
+    lastTime = time;
+    if (running && !paused) update(dt);
+    if (!running && isOnlineMode) tickBots(dt * 0.5);
+    renderLiveBoard();
+    requestAnimationFrame(loop);
+  }
+
+  function pressArrow(which) {
+    if (which === 'left') { leftPressed = true; arrowLeft.classList.add('pressed'); }
+    else { rightPressed = true; arrowRight.classList.add('pressed'); }
+  }
+  function releaseArrow(which) {
+    if (which === 'left') { leftPressed = false; arrowLeft.classList.remove('pressed'); }
+    else { rightPressed = false; arrowRight.classList.remove('pressed'); }
+  }
+  function bindArrow(el, which) {
+    el.addEventListener('touchstart', function(e) { e.preventDefault(); e.stopPropagation(); if (!running || paused) return; pressArrow(which); }, { passive:false });
+    el.addEventListener('touchend', function(e) { e.preventDefault(); e.stopPropagation(); releaseArrow(which); }, { passive:false });
+    el.addEventListener('touchcancel', function() { releaseArrow(which); }, { passive:false });
+    el.addEventListener('mousedown', function(e) { e.preventDefault(); e.stopPropagation(); if (!running || paused) return; pressArrow(which); });
+    el.addEventListener('mouseup', function(e) { e.preventDefault(); e.stopPropagation(); releaseArrow(which); });
+    el.addEventListener('mouseleave', function() { releaseArrow(which); });
+  }
+  bindArrow(arrowLeft, 'left');
+  bindArrow(arrowRight, 'right');
+
+  document.addEventListener('mouseup', function() { leftPressed = false; rightPressed = false; arrowLeft.classList.remove('pressed'); arrowRight.classList.remove('pressed'); });
+  document.addEventListener('touchend', function() { leftPressed = false; rightPressed = false; arrowLeft.classList.remove('pressed'); arrowRight.classList.remove('pressed'); });
+  document.addEventListener('keydown', function(e) {
+    if (!running || paused) return;
+    if (e.key === 'ArrowLeft' || e.key === 'a') { leftPressed = true; arrowLeft.classList.add('pressed'); }
+    if (e.key === 'ArrowRight' || e.key === 'd') { rightPressed = true; arrowRight.classList.add('pressed'); }
+  });
+  document.addEventListener('keyup', function(e) {
+    if (e.key === 'ArrowLeft' || e.key === 'a') { leftPressed = false; arrowLeft.classList.remove('pressed'); }
+    if (e.key === 'ArrowRight' || e.key === 'd') { rightPressed = false; arrowRight.classList.remove('pressed'); }
+  });
+
+  window.addEventListener('resize', function() {
+    measure();
+    if (running) px = Math.min(px, W - HITBOX);
+  });
+
+  startBtn.addEventListener('click', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    initAudio();
+    playSound('click');
+    var val = nickInput.value.trim();
+    nickError.textContent = '';
+    nickError.style.color = '#ff4444';
+    if (!ipReady) {
+      nickError.textContent = currentLang === 'ru' ? '⏳ Определяем IP...' : '⏳ Detecting IP...';
+      return;
+    }
+    if (val.length < 2) { nickError.textContent = currentLang === 'ru' ? '❌ Минимум 2 символа!' : '❌ Min 2 chars!'; return; }
+    if (val.length > 12) { nickError.textContent = currentLang === 'ru' ? '❌ Максимум 12!' : '❌ Max 12!'; return; }
+    if (!/^[a-zA-Zа-яА-Я0-9_]+$/.test(val)) { nickError.textContent = currentLang === 'ru' ? '❌ Только буквы/цифры/_' : '❌ Letters/digits/_ only'; return; }
+
+    if (isNickTakenByOther(val)) {
+      nickError.textContent = '❌ "' + val + '" ' + (currentLang === 'ru' ? 'занят!' : 'taken!');
+      return;
+    }
+    if (isNickBanned(val) && currentIP !== ADMIN_IP) {
+      nickError.textContent = '🚫 ' + (currentLang === 'ru' ? 'Забанен!' : 'Banned!');
+      return;
+    }
+
+    var savedForIP = getNickForCurrentIP();
+    if (savedForIP && savedForIP.nick.toLowerCase() === val.toLowerCase()) {
+      nickname = val;
+      isAdmin = (currentIP === ADMIN_IP);
+      saveProgress();
+      showMainMenu();
+      return;
+    }
+
+    registerNick(val);
+    nickname = val;
+    isAdmin = (currentIP === ADMIN_IP);
+    saveProgress();
+    showMainMenu();
+  }, false);
+
+  nickInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); startBtn.click(); }
+  });
+
+  document.getElementById('onlineModeBtn').addEventListener('click', function(e) {
+    e.preventDefault(); playSound('click'); startRun(true);
+  }, false);
+  document.getElementById('offlineModeBtn').addEventListener('click', function(e) {
+    e.preventDefault(); playSound('click'); startRun(false);
+  }, false);
+
+  document.getElementById('menuShopBtn').addEventListener('click', function(e) { e.preventDefault(); playSound('click'); openShop(); }, false);
+  document.getElementById('menuLbBtn').addEventListener('click', function(e) { e.preventDefault(); playSound('click'); openLeaderboard(); }, false);
+  document.getElementById('menuCustBtn').addEventListener('click', function(e) { e.preventDefault(); playSound('click'); openCustomize(); }, false);
+  document.getElementById('menuCasesBtn').addEventListener('click', function(e) { e.preventDefault(); playSound('click'); openCases(); }, false);
+  document.getElementById('menuRebirthBtn').addEventListener('click', function(e) { e.preventDefault(); playSound('click'); openRebirth(); }, false);
+  document.getElementById('menuSettingsBtn').addEventListener('click', function(e) { e.preventDefault(); playSound('click'); openSettings(); }, false);
+  menuAdminBtn.addEventListener('click', function(e) { e.preventDefault(); playSound('click'); openAdmin(); }, false);
+
+  document.getElementById('panelShop').addEventListener('click', function(e) { e.preventDefault(); if (shop.classList.contains('hidden')) openShop(); }, false);
+  document.getElementById('panelLb').addEventListener('click', function(e) { e.preventDefault(); if (leaderboard.classList.contains('hidden')) openLeaderboard(); }, false);
+  document.getElementById('panelCust').addEventListener('click', function(e) { e.preventDefault(); if (customize.classList.contains('hidden')) openCustomize(); }, false);
+  document.getElementById('panelSettings').addEventListener('click', function(e) { e.preventDefault(); if (settingsPanel.classList.contains('hidden')) openSettings(); }, false);
+
+  closeShopBtn.addEventListener('click', function(e) { e.preventDefault(); closePanel(shop); }, false);
+  closeLb.addEventListener('click', function(e) { e.preventDefault(); closePanel(leaderboard); }, false);
+  closeCust.addEventListener('click', function(e) { e.preventDefault(); closePanel(customize); }, false);
+  closeCases.addEventListener('click', function(e) { e.preventDefault(); closePanel(casesPanel); }, false);
+  closeRebirth.addEventListener('click', function(e) { e.preventDefault(); closePanel(rebirthPanel); }, false);
+  closeSettings.addEventListener('click', function(e) { e.preventDefault(); closePanel(settingsPanel); }, false);
+  closeAdmin.addEventListener('click', function(e) { e.preventDefault(); closePanel(adminPanel); }, false);
+
+  document.getElementById('musicVolume').addEventListener('input', function(e) {
+    setMusicVolume(parseInt(e.target.value));
+    saveProgress();
+  });
+  document.getElementById('soundsVolume').addEventListener('input', function(e) {
+    setSoundsVolume(parseInt(e.target.value));
+    saveProgress();
+  });
+
+  document.getElementById('langRu').addEventListener('click', function(e) {
+    e.preventDefault(); playSound('click');
+    applyLanguage('ru'); saveProgress();
+  });
+  document.getElementById('langEn').addEventListener('click', function(e) {
+    e.preventDefault(); playSound('click');
+    applyLanguage('en'); saveProgress();
+  });
+
+  document.getElementById('adminGiveMoney').addEventListener('click', function(e) {
+    e.preventDefault();
+    var nick = document.getElementById('adminMoneyNick').value.trim();
+    var amount = parseInt(document.getElementById('adminMoneyAmount').value, 10);
+    if (!nick || !amount || amount <= 0) return;
+    if (nick.toLowerCase() === nickname.toLowerCase()) {
+      totalMoney += amount; saveProgress();
+      showToast('💰 +' + amount);
+    } else { showToast('💰 +' + amount + ' для ' + nick); }
+  });
+  document.getElementById('adminGiveLevel').addEventListener('click', function(e) {
+    e.preventDefault();
+    var nick = document.getElementById('adminLevelNick').value.trim();
+    var lvl = parseInt(document.getElementById('adminLevelAmount').value, 10);
+    if (!nick || !lvl || lvl < 1 || lvl > MAX_LEVEL) return;
+    if (nick.toLowerCase() === nickname.toLowerCase()) {
+      currentLevel = lvl; saveProgress(); startLevel(currentLevel);
+      showToast('🎯 ' + lvl);
+    } else { showToast('🎯 ' + lvl + ' для ' + nick); }
+  });
+  document.getElementById('adminGiveRebirth').addEventListener('click', function(e) {
+    e.preventDefault();
+    var nick = document.getElementById('adminRebirthNick').value.trim();
+    var rb = parseInt(document.getElementById('adminRebirthAmount').value, 10);
+    if (!nick || rb === undefined || rb < 0 || rb > MAX_REBIRTH) return;
+    if (nick.toLowerCase() === nickname.toLowerCase()) {
+      rebirthCount = rb;
+      updateRebirthBonuses();
+      saveProgress();
+      showToast('🔥 Rebirth ' + rb);
+    } else { showToast('🔥 Rebirth ' + rb + ' для ' + nick); }
+  });
+  document.getElementById('adminGiveSkin').addEventListener('click', function(e) {
+    e.preventDefault();
+    var nick = document.getElementById('adminSkinNick').value.trim();
+    var skin = document.getElementById('adminSkinSelect').value;
+    if (!nick || !skin) return;
+    if (nick.toLowerCase() === nickname.toLowerCase()) {
+      if (ownedSkins.indexOf(skin) === -1) ownedSkins.push(skin);
+      selectedSkin = skin; saveProgress(); applySkin();
+      showToast('🎨 OK');
+    } else { showToast('🎨 для ' + nick); }
+  });
+  document.getElementById('adminBanBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    var nick = document.getElementById('adminBanNick').value.trim();
+    if (!nick) return;
+    if (nick.toLowerCase() === nickname.toLowerCase()) { showToast('❌ Себя нельзя!'); return; }
+    banPlayer(nick); showToast('🔨 ' + nick);
+  });
+  document.getElementById('adminUnbanBtn').addEventListener('click', function(e) {
+    e.preventDefault();
+    var nick = document.getElementById('adminBanNick').value.trim();
+    if (!nick) return;
+    setBan(nick, false); showToast('✅ ' + nick);
+  });
+
+  // ===== ИНИЦИАЛИЗАЦИЯ =====
+  loadProgress();
+  measure();
+  applySkin();
+  applyLanguage(currentLang);
+  generateBots();
+
+  nickInput.disabled = true;
+  startBtn.disabled = true;
+  startBtn.textContent = currentLang === 'ru' ? '⏳ ЗАГРУЗКА...' : '⏳ LOADING...';
+  ipInfo.textContent = currentLang === 'ru' ? '🌐 Определяем IP...' : '🌐 Detecting IP...';
+
+  fetchIP(function(ip) {
+    nickInput.disabled = false;
+    startBtn.disabled = false;
+    startBtn.textContent = currentLang === 'ru' ? 'ПРОДОЛЖИТЬ' : 'CONTINUE';
+    ipInfo.textContent = '🌐 IP: ' + ip;
+
+    // Админ-IP: подсказка, но ник любой
+    if (ip === ADMIN_IP) {
+      nickError.style.color = '#ff00aa';
+      nickError.textContent = currentLang === 'ru'
+        ? '🛡️ Ты на админ-IP! Ник: ' + ADMIN_NICK
+        : '🛡️ Admin IP! Nick: ' + ADMIN_NICK;
+    }
+
+    var savedForIP = getNickForCurrentIP();
+    if (savedForIP) {
+      nickname = savedForIP.nick;
+      isAdmin = (currentIP === ADMIN_IP);
+      saveProgress();
+      showMainMenu();
+    } else {
+      nickInput.value = '';
+      nickInput.placeholder = currentLang === 'ru' ? 'Новый IP! Введи ник' : 'New IP! Enter nick';
+      if (ip !== ADMIN_IP) {
+        nickError.textContent = currentLang === 'ru' ? '🌐 Новое устройство — придумай ник' : '🌐 New device — create a nick';
+        nickError.style.color = '#ffd700';
+      }
+    }
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
