@@ -1,0 +1,20 @@
+{
+  "name": "Упасть в пропасть",
+  "short_name": "Пропасть",
+  "start_url": "/Hole-fall/",
+  "display": "standalone",
+  "background_color": "#0a0a1a",
+  "theme_color": "#ffd700",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192/ffd700/000000?text=Game",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512/ffd700/000000?text=Game",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
