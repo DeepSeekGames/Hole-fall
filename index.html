@@ -2,6 +2,11 @@
 <html lang="ru">
 <head>
  <title><link rel="manifest" href="manifest.json"></title>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Упасть в пропасть — Релиз 1 версия</title>
